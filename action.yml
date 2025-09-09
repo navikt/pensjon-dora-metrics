@@ -8,6 +8,9 @@ inputs:
   github_token:
     description: 'GitHub token'
     required: true
+  nais_deploy_apikey:
+    description: 'Nais deploy apikey'
+    required: true
 runs:
   using: composite
   steps:
@@ -26,6 +29,6 @@ runs:
       uses: nais/deploy/actions/deploy@master
       env:
         IMAGE: ${{ steps.docker-push.outputs.image }}
-        APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
+        APIKEY: ${{ inputs.nais_deploy_apikey }}
         CLUSTER: dev-gcp
         RESOURCE: .nais/dora-naisjob.yml
