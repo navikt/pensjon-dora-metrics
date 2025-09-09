@@ -1,0 +1,29 @@
+name: actions
+author: Pesys Felles
+description: actions
+inputs:
+  team:
+    description: 'Team name'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Build and push Docker image
+      uses: nais/docker-build-push@v0
+      id: docker-push
+      with:
+        team: pensjon-q2
+        build_secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
+          salsa: true
+
+    - name: Deploy to dev-gcp
+      uses: nais/deploy/actions/deploy@master
+      env:
+        IMAGE: ${{ steps.docker-push.outputs.image }}
+        APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
+        CLUSTER: dev-gcp
+        RESOURCE: .nais/dora-naisjob.yml

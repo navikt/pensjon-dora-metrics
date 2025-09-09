@@ -1,0 +1,22 @@
+apiVersion: nais.io/v1
+kind: Naisjob
+metadata:
+  name: "dora-metrics-job-pen-q2"
+  namespace: "pensjon-q2"
+  labels:
+    team: "pensjon-q2"
+spec:
+  image: {{image}}
+  resources:
+    requests:
+      cpu: 200m
+      memory: 128Mi
+  gcp:
+    bigQueryDatasets:
+      - name: pensjon_dora_metrics
+        permission: READWRITE
+  observability:
+    logging:
+      destinations:
+        - id: elastic
+        - id: loki

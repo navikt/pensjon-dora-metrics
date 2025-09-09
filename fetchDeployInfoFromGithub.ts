@@ -1,0 +1,137 @@
+import fs from 'fs';
+import {Octokit} from "@octokit/core";
+import type {GithubData, PullRequest} from "./model";
+import {findPullReference} from "./utils.ts";
+
+const token = process.env.GITHUB_TOKEN;
+
+const octokit = new Octokit({
+    auth: token,
+})
+const headers = {
+    'X-GitHub-Api-Version': '2022-11-28'
+}
+
+async function getGithubData(): Promise<PullRequest[]> {
+
+    const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
+        owner: 'navikt',
+        repo: 'pensjon-pen',
+        state: 'closed',
+        per_page: 100,
+        page: 1,
+        headers,
+    })
+
+    return (await Promise.all(pulls.data.filter(pull => pull.merged_at).map(async (pull) => {
+
+        const isHotfix = pull.labels.map(label => label.name).includes("hotfix") || pull.head.ref.toLowerCase().startsWith("hotfix");
+
+        if(pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
+            //Add label if missing
+            await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+                owner: 'navikt',
+                repo: 'pensjon-pen',
+                issue_number: pull.number,
+                labels: ["hotfix"],
+                headers,
+            });
+
+        }
+
+        const commits = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/commits', {
+            owner: 'navikt',
+            repo: 'pensjon-pen',
+            pull_number: pull.number,
+            headers,
+        });
+
+        const workflows = (await octokit.request('GET /repos/{owner}/{repo}/actions/runs', {
+            owner: 'navikt',
+            repo: 'pensjon-pen',
+            branch: 'main',
+            status: 'success',
+            head_sha: pull.merge_commit_sha,
+            workflow_id: 'deployProd.yml',
+            headers,
+        })).data.workflow_runs.filter(workflow => workflow.name === "Build and deploy main");
+
+        const reviewComments = (await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/comments', {
+            owner: 'navikt',
+            repo: 'pensjon-pen',
+            pull_number: pull.number,
+            headers,
+        })).data.map(comment => comment.body);
+
+        const issueComments = (await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+            owner: 'navikt',
+            repo: 'pensjon-pen',
+            issue_number: pull.number,
+            headers,
+        })).data.map(comment => comment.body);
+
+        const comments = reviewComments.concat(issueComments);
+
+        if(isHotfix) {
+            const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || null;
+            if(referencedPull === null) {
+                //Ask for reference in a comment if not already asked
+                const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray:";
+                if(!comments.includes(body)) {
+                    await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+                        owner: 'navikt',
+                        repo: 'pensjon-pen',
+                        issue_number: pull.number,
+                        body,
+                        headers,
+                    });
+                }
+            }
+        }
+
+        if(workflows.length === 0) {
+            //Not yet deployed
+            return null;
+        }
+
+        const workflow = workflows[0]
+
+        const jobs = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', {
+            owner: 'navikt',
+            repo: 'pensjon-pen',
+            run_id: workflow.id,
+            headers,
+        })
+
+        const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => job.name === "Deploy pen to production")
+
+        if(deploymentJob === undefined) {
+            throw new Error("No deployment job found for pull request " + pull.number);
+        }
+
+        return {
+            pullNumber: pull.number,
+            branch: pull.head.ref,
+            comments: comments,
+            labels: pull.labels.map(label => label.name),
+            mergedAt: pull.merged_at,
+            title: pull.title,
+            commits: commits.data.map(commit => ({
+                message: commit.commit.message,
+                timestamp: commit.commit.author?.date,
+            })),
+            deployment: {
+                environment: "prod",
+                deployedAt: deploymentJob.completed_at,
+            }
+        };
+    }))).filter(pr => pr !== null) as PullRequest[];
+}
+
+const githubData: GithubData = {
+    pullRequests: await getGithubData()
+}
+
+console.log(JSON.stringify(githubData, null, 2));
+
+fs.writeFileSync("github.json", JSON.stringify(githubData))
