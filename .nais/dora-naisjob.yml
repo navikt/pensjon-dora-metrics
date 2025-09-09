@@ -1,7 +1,7 @@
 apiVersion: nais.io/v1
 kind: Naisjob
 metadata:
-  name: "dora-metrics-job-pen-dev"
+  name: "dora-metrics-job"
   namespace: "pesys-felles"
   labels:
     team: "pesys-felles"
