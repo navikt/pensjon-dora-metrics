@@ -13,7 +13,7 @@ const headers = {
 }
 
 const owner = 'navikt';
-const repositories =['pensjon-pen','penson-psak'];
+const repositories =['pensjon-pen','pensjon-psak'];
 const deploy_jobs = ['deploy pen to production', 'Deploy prod']
 
 async function getGithubData(repo:string): Promise<PullRequest[]> {
