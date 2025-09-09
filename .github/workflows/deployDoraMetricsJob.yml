@@ -1,9 +1,8 @@
 name: Deploy DORA Metrics Job
 
 on:
-  repository_dispatch:
-    types: [dora-metrics]
-  workflow_dispatch:
+  schedule:
+    - 0 9-17 * * *
 
 jobs:
   build-push-and-deploy:
