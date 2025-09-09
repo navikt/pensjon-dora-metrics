@@ -27,11 +27,11 @@ jobs:
           build_secrets: github_token=${{ secrets.DORA_PAT }}
           salsa: true
 
-      - name: Deploy to dev-gcp
+      - name: Deploy to prod-gcp
         uses: nais/deploy/actions/deploy@master
         env:
           IMAGE: ${{ steps.docker-push.outputs.image }}
           APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
-          CLUSTER: dev-gcp
+          CLUSTER: prod-gcp
           RESOURCE: .nais/dora-naisjob.yml
 
