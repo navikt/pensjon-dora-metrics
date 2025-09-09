@@ -19,9 +19,8 @@ runs:
       id: docker-push
       with:
         team: pensjon-q2
-        build_secrets: |
-            github_token=${{ inputs.github_token }}
-          salsa: true
+        build_secrets: github_token=${{ inputs.github_token }}
+        salsa: true
 
     - name: Deploy to dev-gcp
       uses: nais/deploy/actions/deploy@master
