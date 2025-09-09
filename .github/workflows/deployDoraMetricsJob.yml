@@ -24,7 +24,7 @@ jobs:
         id: docker-push
         with:
           team: pesys-felles
-          build_secrets: github_token=${{ secrets.GITHUB_TOKEN }}
+          build_secrets: github_token=${{ secrets.DORA_PAT }}
           salsa: true
 
       - name: Deploy to dev-gcp
