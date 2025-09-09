@@ -1,6 +1,6 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
-import type {GithubData, PullRequest} from "./model";
+import type {GithubData, PullRequest, Repository} from "./model";
 import {findPullReference} from "./utils.ts";
 
 const token = process.env.GITHUB_TOKEN;
@@ -12,11 +12,15 @@ const headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
-async function getGithubData(): Promise<PullRequest[]> {
+const owner = 'navikt';
+const repositories =['pensjon-pen','penson-psak'];
+const deploy_jobs = ['deploy pen to production', 'Deploy prod']
+
+async function getGithubData(repo:string): Promise<PullRequest[]> {
 
     const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
-        owner: 'navikt',
-        repo: 'pensjon-pen',
+        owner,
+        repo,
         state: 'closed',
         per_page: 100,
         page: 1,
@@ -30,8 +34,8 @@ async function getGithubData(): Promise<PullRequest[]> {
         if(pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
             //Add label if missing
             await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-                owner: 'navikt',
-                repo: 'pensjon-pen',
+                owner,
+                repo,
                 issue_number: pull.number,
                 labels: ["hotfix"],
                 headers,
@@ -40,15 +44,15 @@ async function getGithubData(): Promise<PullRequest[]> {
         }
 
         const commits = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/commits', {
-            owner: 'navikt',
-            repo: 'pensjon-pen',
+            owner,
+            repo,
             pull_number: pull.number,
             headers,
         });
 
         const workflows = (await octokit.request('GET /repos/{owner}/{repo}/actions/runs', {
-            owner: 'navikt',
-            repo: 'pensjon-pen',
+            owner,
+            repo,
             branch: 'main',
             status: 'success',
             head_sha: pull.merge_commit_sha,
@@ -57,15 +61,15 @@ async function getGithubData(): Promise<PullRequest[]> {
         })).data.workflow_runs.filter(workflow => workflow.name === "Build and deploy main");
 
         const reviewComments = (await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/comments', {
-            owner: 'navikt',
-            repo: 'pensjon-pen',
+            owner,
+            repo,
             pull_number: pull.number,
             headers,
         })).data.map(comment => comment.body);
 
         const issueComments = (await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-            owner: 'navikt',
-            repo: 'pensjon-pen',
+            owner,
+            repo,
             issue_number: pull.number,
             headers,
         })).data.map(comment => comment.body);
@@ -79,7 +83,7 @@ async function getGithubData(): Promise<PullRequest[]> {
                 const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray:";
                 if(!comments.includes(body)) {
                     await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-                        owner: 'navikt',
+                        owner,
                         repo: 'pensjon-pen',
                         issue_number: pull.number,
                         body,
@@ -97,13 +101,13 @@ async function getGithubData(): Promise<PullRequest[]> {
         const workflow = workflows[0]
 
         const jobs = await octokit.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', {
-            owner: 'navikt',
-            repo: 'pensjon-pen',
+            owner,
+            repo,
             run_id: workflow.id,
             headers,
         })
 
-        const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => job.name === "Deploy pen to production")
+        const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => deploy_jobs.includes(job.name))
 
         if(deploymentJob === undefined) {
             throw new Error("No deployment job found for pull request " + pull.number);
@@ -128,8 +132,17 @@ async function getGithubData(): Promise<PullRequest[]> {
     }))).filter(pr => pr !== null) as PullRequest[];
 }
 
+
+const repositoryData: Repository[] = await Promise.all(repositories.map(async (name) => {
+    const pulls = await getGithubData(name);
+    return {
+        name,
+        pulls,
+    } as Repository;
+}));
+
 const githubData: GithubData = {
-    pullRequests: await getGithubData()
+    repositories: repositoryData,
 }
 
 console.log(JSON.stringify(githubData, null, 2));

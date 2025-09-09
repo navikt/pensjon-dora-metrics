@@ -1,70 +1,108 @@
 import fs from 'fs';
-import type {GithubData, HotfixDeploy, SuccessfulDeploy} from "./model.ts";
+import type {GithubData, HotfixDeploy, Repository, SuccessfulDeploy} from "./model.ts";
 import {findPullReference} from "./utils.ts";
-import {BigQuery} from "@google-cloud/bigquery";
+import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
+import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 
-const githubData = JSON.parse(fs.readFileSync('github.json', 'utf8')) as GithubData;
+run();
 
-const {pullRequests} = githubData;
+function run() {
 
-const successfulDeploys: SuccessfulDeploy[] = pullRequests.map(deploy => {
-    const lastCommit = deploy.commits.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-    const leadTime = (new Date(deploy.deployment.deployedAt).getTime() - new Date(lastCommit.timestamp).getTime()) / (1000 * 60);
-    console.log(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes`);
-    return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, leadTime: leadTime.toFixed(2)};
-})
+    const {dataset} = setupBiqQuery('pensjon_dora_metrics')
+    const {repositories} = getGithubDataFromFile('github.json')
 
-const hotfixDeploys: HotfixDeploy[] = pullRequests
-    .filter(pr => pr.labels.includes("hotfix") || pr.branch.toLowerCase().startsWith("hotfix"))
-    .map(deploy => {
-        const hotfixPull = findPullReference(deploy.comments) || findPullReference(deploy.commits.map(c => c.message)) || null;
-        if (hotfixPull === null) {
+    const {successfulDeploys, hotfixDeploys} = repositories.reduce(
+        (acc, repository) => {
+            const {successfulDeploys: s, hotfixDeploys: h} = createDoraMetricsFromRepository(repository);
+            acc.successfulDeploys.push(...s);
+            acc.hotfixDeploys.push(...h);
+            return acc;
+        },
+        {successfulDeploys: [] as SuccessfulDeploy[], hotfixDeploys: [] as HotfixDeploy[]}
+    );
 
-            //if time is less than a day, ignore and give it som time
-            const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
-            if (daysSinceDeploy < 2) {
-                console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
-                return null;
-            }
-            console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
-            return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
-        }
-        const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
-        if (referencedDeploy === undefined) {
-            console.log(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
-            return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
-        }
-        const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
-        console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull})`);
+    pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
+}
+
+function createDoraMetricsFromRepository(repository: Repository): {
+    successfulDeploys: SuccessfulDeploy[],
+    hotfixDeploys: HotfixDeploy[]
+} {
+
+    const {pulls} = repository;
+
+    const successfulDeploys: SuccessfulDeploy[] = pulls.map(deploy => {
+        const lastCommit = deploy.commits.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+        const leadTime = (new Date(deploy.deployment.deployedAt).getTime() - new Date(lastCommit.timestamp).getTime()) / (1000 * 60);
+        console.log(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes`);
         return {
             pull: deploy.pullNumber,
+            repo: repository.name,
             deployedAt: deploy.deployment.deployedAt,
-            timeToRecovery: timeToRecovery.toFixed(2)
+            leadTime: leadTime.toFixed(2)
         };
-    }).filter(deploy => deploy !== null) as HotfixDeploy[];
+    })
 
-const bigqueryClient = new BigQuery();
-const dataset = bigqueryClient.dataset('pensjon_dora_metrics');
+    const hotfixDeploys: HotfixDeploy[] = pulls
+        .filter(pr => pr.labels.includes("hotfix") || pr.branch.toLowerCase().startsWith("hotfix"))
+        .map(deploy => {
+            const hotfixPull = findPullReference(deploy.comments) || findPullReference(deploy.commits.map(c => c.message)) || null;
+            if (hotfixPull === null) {
 
-const schemaSuccessfulDeploys: TableSchema = {
-    fields: [
-        {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
-        {name: 'deployedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
-        {name: 'leadTime', type: 'FLOAT', mode: 'REQUIRED'},
-    ],
+                //if time is less than a day, ignore and give it som time
+                const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
+                if (daysSinceDeploy < 2) {
+                    console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
+                    return null;
+                }
+                console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
+                return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
+            }
+            const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
+            if (referencedDeploy === undefined) {
+                console.log(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
+                return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
+            }
+            const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
+            console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull})`);
+            return {
+                pull: deploy.pullNumber,
+                repo: repository.name,
+                deployedAt: deploy.deployment.deployedAt,
+                timeToRecovery: timeToRecovery.toFixed(2)
+            };
+        }).filter(deploy => deploy !== null) as HotfixDeploy[];
+    return {
+        successfulDeploys,
+        hotfixDeploys,
+    }
 }
 
-const schemaHotfixDeploys: TableSchema = {
-    fields: [
-        {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
-        {name: 'timestamp', type: 'TIMESTAMP', mode: 'REQUIRED'},
-        {name: 'timeToRecovery', type: 'FLOAT', mode: 'NULLABLE'},
-    ],
+
+function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
+    successfulDeploys: SuccessfulDeploy[],
+    hotfixDeploys: HotfixDeploy[],
+    dataset: Dataset
+}) {
+
+    //filter out entries that are already in the table
+    const successfulDeploysTable = dataset.table('successful_deploys');
+    const [successfulDeploysRows] = await successfulDeploysTable.getRows();
+    const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull));
+    console.log(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
+    const hotfixDeploysTable = dataset.table('hotfix_deploys');
+    const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
+    const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull));
+    console.log(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
+
+    //insert only new rows
+    await insertData('successful_deploys', successfulDeploysToInsert, dataset);
+    await insertData('hotfix_deploys', hotfixDeploysToInsert, dataset);
+
 }
 
-// Ensure tables exist
-async function ensureTable(tableName: string, schema: TableSchema) {
+async function ensureTable(tableName: string, schema: TableSchema, dataset: Dataset) {
     const table = dataset.table(tableName);
     const [exists] = await table.exists();
     if (!exists) {
@@ -75,11 +113,8 @@ async function ensureTable(tableName: string, schema: TableSchema) {
     }
 }
 
-await ensureTable('successful_deploys', schemaSuccessfulDeploys);
-await ensureTable('hotfix_deploys', schemaHotfixDeploys);
 
-// Insert data into BigQuery
-async function insertData(tableName: string, rows: RowMetadata[]) {
+async function insertData(tableName: string, rows: RowMetadata[], dataset: Dataset) {
     if (rows.length === 0) {
         console.log(`No new data to insert into ${tableName}.`);
         return;
@@ -93,19 +128,19 @@ async function insertData(tableName: string, rows: RowMetadata[]) {
     }
 }
 
-//filter out entries that are already in the table
-const successfulDeploysTable = dataset.table('successful_deploys');
-const [successfulDeploysRows] = await successfulDeploysTable.getRows();
-const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull));
-console.log(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
-const hotfixDeploysTable = dataset.table('hotfix_deploys');
-const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
-const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull));
-console.log(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
+function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset: Dataset } {
 
-//insert only new rows
-await insertData('successful_deploys', successfulDeploysToInsert);
-await insertData('hotfix_deploys', hotfixDeploysToInsert);
+    const bigqueryClient = new BigQuery();
+    const dataset = bigqueryClient.dataset(datasetKey);
 
+    BIGQUERY_TABLE_SCHEMAS.forEach(({name, schema}) => {
+        await ensureTable(name, schema, dataset);
+    })
 
+    return {bigqueryClient, dataset};
+}
 
+function getGithubDataFromFile(filePath: string): GithubData {
+    const data = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(data) as GithubData;
+}

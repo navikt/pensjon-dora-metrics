@@ -1,6 +1,12 @@
+import type {TableSchema} from "@google-cloud/bigquery";
 
 export type GithubData = {
-    pullRequests: PullRequest[];
+    repositories: Repository[];
+}
+
+export type Repository = {
+    name: string;
+    pulls: PullRequest[];
 }
 
 export type PullRequest = {
@@ -26,12 +32,14 @@ export type Deployment = {
 
 export type SuccessfulDeploy = {
     pull: number;
+    repo: string;
     deployedAt: string;
     leadTime: string;
 }
 
 export type HotfixDeploy = {
     pull: number;
+    repo: string;
     timestamp: string;
     timeToRecovery: string | null;
 }
