@@ -5,6 +5,9 @@ inputs:
   team:
     description: 'Team name'
     required: true
+  github_token:
+    description: 'GitHub token'
+    required: true
 runs:
   using: composite
   steps:
@@ -17,7 +20,7 @@ runs:
       with:
         team: pensjon-q2
         build_secrets: |
-            github_token=${{ secrets.GITHUB_TOKEN }}
+            github_token=${{ inputs.github_token }}
           salsa: true
 
     - name: Deploy to dev-gcp
