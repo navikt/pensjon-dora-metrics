@@ -5,12 +5,6 @@ inputs:
   team:
     description: 'Team name'
     required: true
-  github_token:
-    description: 'GitHub token'
-    required: true
-  nais_deploy_apikey:
-    description: 'Nais deploy apikey'
-    required: true
 runs:
   using: composite
   steps:
@@ -22,13 +16,13 @@ runs:
       id: docker-push
       with:
         team: pesys-felles
-        build_secrets: github_token=${{ inputs.github_token }}
+        build_secrets: github_token=${{ secrets.GITHUB_TOKEN }}
         salsa: true
 
     - name: Deploy to dev-gcp
       uses: nais/deploy/actions/deploy@master
       env:
         IMAGE: ${{ steps.docker-push.outputs.image }}
-        APIKEY: ${{ inputs.nais_deploy_apikey }}
+        APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
         CLUSTER: dev-gcp
         RESOURCE: .nais/dora-naisjob.yml
