@@ -1,10 +1,22 @@
-name: actions
-author: Pesys Felles
-description: actions
-inputs:
-  team:
-    description: 'Team name'
-    required: true
+name: Deploy DORA Metrics Job
+
+on:
+  repository_dispatch:
+    types: [dora-metrics]
+
+jobs:
+  build-push-and-deploy:
+    name: Build, push, and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      actions: read
+      packages: write
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout
 runs:
   using: composite
   steps:
