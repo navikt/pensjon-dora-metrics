@@ -21,7 +21,7 @@ runs:
       uses: nais/docker-build-push@v0
       id: docker-push
       with:
-        team: pensjon-q2
+        team: pesys-felles
         build_secrets: github_token=${{ inputs.github_token }}
         salsa: true
 

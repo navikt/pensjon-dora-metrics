@@ -1,10 +1,10 @@
 apiVersion: nais.io/v1
 kind: Naisjob
 metadata:
-  name: "dora-metrics-job-pen-q2"
-  namespace: "pensjon-q2"
+  name: "dora-metrics-job-pen-dev"
+  namespace: "pesys-felles"
   labels:
-    team: "pensjon-q2"
+    team: "pesys-felles"
 spec:
   image: {{image}}
   resources:
