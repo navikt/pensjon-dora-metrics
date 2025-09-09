@@ -5,25 +5,23 @@ import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 
-run();
 
-function run() {
 
-    const {dataset} = setupBiqQuery('pensjon_dora_metrics')
-    const {repositories} = getGithubDataFromFile('github.json')
+const {dataset} = setupBiqQuery('pensjon_dora_metrics')
+const {repositories} = getGithubDataFromFile('github.json')
 
-    const {successfulDeploys, hotfixDeploys} = repositories.reduce(
-        (acc, repository) => {
-            const {successfulDeploys: s, hotfixDeploys: h} = createDoraMetricsFromRepository(repository);
-            acc.successfulDeploys.push(...s);
-            acc.hotfixDeploys.push(...h);
-            return acc;
-        },
-        {successfulDeploys: [] as SuccessfulDeploy[], hotfixDeploys: [] as HotfixDeploy[]}
-    );
+const {successfulDeploys, hotfixDeploys} = repositories.reduce(
+    (acc, repository) => {
+        const {successfulDeploys: s, hotfixDeploys: h} = createDoraMetricsFromRepository(repository);
+        acc.successfulDeploys.push(...s);
+        acc.hotfixDeploys.push(...h);
+        return acc;
+    },
+    {successfulDeploys: [] as SuccessfulDeploy[], hotfixDeploys: [] as HotfixDeploy[]}
+);
 
-    pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
-}
+pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
+
 
 function createDoraMetricsFromRepository(repository: Repository): {
     successfulDeploys: SuccessfulDeploy[],

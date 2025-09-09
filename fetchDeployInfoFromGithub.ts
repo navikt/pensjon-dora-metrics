@@ -110,7 +110,7 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
         const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => deploy_jobs.includes(job.name))
 
         if(deploymentJob === undefined) {
-            throw new Error("No deployment job found for pull request " + pull.number);
+            throw new Error("No deployment job found for pull request " + pull.number + " in repo " + repo);
         }
 
         return {
