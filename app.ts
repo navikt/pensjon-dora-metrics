@@ -6,9 +6,6 @@ import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 
-
-
-
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
@@ -57,13 +54,23 @@ function createDoraMetricsFromRepository(repository: Repository): {
                     logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
                     return null;
                 }
-                logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
-                return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
+                logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
+                return {
+                    pull: deploy.pullNumber,
+                    repo: repository.name,
+                    deployedAt: deploy.deployment.deployedAt,
+                    timeToRecovery: null
+                };
             }
             const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
             if (referencedDeploy === undefined) {
-                logger.info(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
-                return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
+                logger.warn(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
+                return {
+                    pull: deploy.pullNumber,
+                    repo: repository.name,
+                    deployedAt: deploy.deployment.deployedAt,
+                    timeToRecovery: null
+                };
             }
             const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
             logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
@@ -97,7 +104,6 @@ async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
     const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull && row.repo === hd.repo));
     logger.info(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
-
 
 
     //insert only new rows
