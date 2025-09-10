@@ -25,7 +25,7 @@ async function getGithubData(repo: string, teamMembers: User[]): Promise<PullReq
         owner,
         repo,
         state: 'closed',
-        per_page: 100,
+        per_page: 50,
         page: 1,
         headers,
     })

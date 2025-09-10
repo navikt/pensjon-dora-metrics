@@ -138,12 +138,9 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
     } catch (error) {
         if (error.name === 'PartialFailureError' && Array.isArray(error.errors)) {
             logger.error(`Partial failure inserting into ${tableName}. Successful rows may exist.`);
-            const failedDetails = error.errors.map((e: any) => ({
-                index: e.rowIndex ?? e.row?.__index ?? null,
-                reason: e.reason,
-                message: e.message
-            }));
+            const failedDetails = error.errors.map((e: any) => (e));
             logger.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
+            logger.error(JSON.stringify(error))
         }
     }
 }
