@@ -126,8 +126,15 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
         await table.insert(rows);
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
-        console.error(`Error inserting data into ${tableName}:`, error);
-        console.log(JSON.stringify(error))
+        if (error.name === 'PartialFailureError' && Array.isArray(error.errors)) {
+            console.error(`Partial failure inserting into ${tableName}. Successful rows may exist.`);
+            const failedDetails = error.errors.map((e: any) => ({
+                index: e.rowIndex ?? e.row?.__index ?? null,
+                reason: e.reason,
+                message: e.message
+            }));
+            console.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
+        }
     }
 }
 
