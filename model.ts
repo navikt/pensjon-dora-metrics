@@ -6,7 +6,7 @@ export type GithubData = {
 export type RepostioryToFetch = {
     name: string;
     workflow: string;
-    deployJob: string;
+    job: string;
 }
 
 export type User = {

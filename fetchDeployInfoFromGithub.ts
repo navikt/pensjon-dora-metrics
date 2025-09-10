@@ -164,8 +164,8 @@ async function getTeamMembers(): Promise<User[]> {
 
 const teamMembers = await getTeamMembers();
 
-const repositoryData: Repository[] = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, deployJob}) => {
-    const pulls = await getGithubData(name, workflow, deployJob, teamMembers);
+const repositoryData: Repository[] = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
+    const pulls = await getGithubData(name, workflow, job, teamMembers);
     return {
         name,
         pulls,

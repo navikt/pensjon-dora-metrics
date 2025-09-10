@@ -133,6 +133,9 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
             const failedDetails = error.errors.map((e: any) => (e));
             logger.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
             logger.error(JSON.stringify(error))
+        } else {
+            logger.error(`Error inserting into ${tableName}: ${error.message}`);
+            logger.error(JSON.stringify(error))
         }
     }
 }
