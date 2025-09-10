@@ -4,17 +4,9 @@ import {findPullReference} from "./utils.ts";
 import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
-import winston  from "winston";
-import ecsFormat from "@elastic/ecs-winston-format";
+import {logger} from "./logger.ts";
 
-const logger = winston.createLogger({
-    level: 'info',
-    format: ecsFormat({ convertReqRes: true }), // Converts HTTP request/response objects to ECS format
-    transports: [
-        new winston.transports.Console(),
-        new winston.transports.File({ filename: 'application.log' }), // Log to a file
-    ],
-});
+
 
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')

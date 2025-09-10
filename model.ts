@@ -1,7 +1,12 @@
-import type {TableSchema} from "@google-cloud/bigquery";
 
 export type GithubData = {
     repositories: Repository[];
+}
+
+export type RepostioryToFetch = {
+    name: string;
+    workflow: string;
+    deployJob: string;
 }
 
 export type User = {

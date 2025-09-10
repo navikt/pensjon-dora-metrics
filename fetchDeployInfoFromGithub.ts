@@ -1,7 +1,8 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
-import type {GithubData, PullRequest, Repository, User} from "./model";
+import type {GithubData, PullRequest, Repository, RepostioryToFetch, User} from "./model";
 import {findPullReference} from "./utils.ts";
+import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
 
 const token = process.env.GITHUB_TOKEN;
 
@@ -12,14 +13,7 @@ const headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
-const owner = 'navikt';
-const repositories = ['pensjon-pen', 'pensjon-psak'];
-const deploy_jobs = ['Deploy pen to production', 'Deploy prod']
-
-
-async function getGithubData(repo: string, teamMembers: User[]): Promise<PullRequest[]> {
-
-
+async function getGithubData(repo: string, workflowName: string, deployJob: string, teamMembers: User[]): Promise<PullRequest[]> {
 
     const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner,
@@ -62,7 +56,7 @@ async function getGithubData(repo: string, teamMembers: User[]): Promise<PullReq
             head_sha: pull.merge_commit_sha,
             workflow_id: 'deployProd.yml',
             headers,
-        })).data.workflow_runs.filter(workflow => workflow.name === "Build and deploy main");
+        })).data.workflow_runs.filter(workflow => workflow.name.toLowerCase() === workflowName.toLowerCase());
 
         const reviewComments = (await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/comments', {
             owner,
@@ -112,7 +106,7 @@ async function getGithubData(repo: string, teamMembers: User[]): Promise<PullReq
         })
 
         const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => {
-            return deploy_jobs.some(deploy_job => job.name.toLowerCase().includes(deploy_job.toLowerCase()));
+            return job.name.toLowerCase().includes(deployJob.toLowerCase());
         })
 
         if (deploymentJob === undefined) {
@@ -170,8 +164,8 @@ async function getTeamMembers(): Promise<User[]> {
 
 const teamMembers = await getTeamMembers();
 
-const repositoryData: Repository[] = await Promise.all(repositories.map(async (name) => {
-    const pulls = await getGithubData(name, teamMembers);
+const repositoryData: Repository[] = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, deployJob}) => {
+    const pulls = await getGithubData(name, workflow, deployJob, teamMembers);
     return {
         name,
         pulls,
