@@ -103,8 +103,11 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
     const [job] = await dataset.bigQuery.createQueryJob(options);
     const [rows] = await job.getQueryResults();
     if (rows.length > 0) {
+        logger.info("Found existing successful deploy in BigQuery for PR #" + pull + " in repo " + repo);
+        logger.info(rows[0])
         return rows[0] as SuccessfulDeploy;
     }
+    logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
     return null;
 }
 
