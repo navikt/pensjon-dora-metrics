@@ -19,7 +19,7 @@ async function getGithubData(repo: string, workflowName: string, deployJob: stri
         owner,
         repo,
         state: 'closed',
-        per_page: 50,
+        per_page: 100,
         page: 1,
         headers,
     })
