@@ -108,11 +108,13 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
             headers,
         })
 
-        const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => deploy_jobs.includes(job.name))
+        const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => {
+            return deploy_jobs.some(deploy_job => job.name.toLowerCase().includes(deploy_job.toLowerCase()))
+        })
 
         if(deploymentJob === undefined) {
             console.log("Workflow run: ", workflow.html_url);
-            console.log("Jobs: ")
+            console.log("Jobs: ");
             console.log(jobs.data.jobs.map(job => job.name + " - " + job.conclusion).join("\n"));
             throw new Error("No deployment job found for pull request " + pull.number + " in repo " + repo);
         }
