@@ -126,7 +126,7 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
         //Handle errors for individual rows
         //https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-json#handling_errors
 
-        const response = await table.insert(rows, {ignoreUnknownValues: true, skipInvalidRows: true});
+        const response = await table.insert(rows);
         console.log("insert response: ", JSON.stringify(response))
 
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
