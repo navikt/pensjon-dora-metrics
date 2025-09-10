@@ -75,7 +75,7 @@ async function getGithubData(repo: string, workflowName: string, deployJob: stri
         const comments = reviewComments.concat(issueComments);
 
         if (isHotfix) {
-            const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || null;
+            const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || findPullReference(pull.body) || null;
             if (referencedPull === null) {
                 //Ask for reference in a comment if not already asked
                 const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray:";
