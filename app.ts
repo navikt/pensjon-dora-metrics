@@ -4,7 +4,17 @@ import {findPullReference} from "./utils.ts";
 import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
+import winston  from "winston";
+import ecsFormat from "@elastic/ecs-winston-format";
 
+const logger = winston.createLogger({
+    level: 'info',
+    format: ecsFormat({ convertReqRes: true }), // Converts HTTP request/response objects to ECS format
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'application.log' }), // Log to a file
+    ],
+});
 
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
@@ -33,7 +43,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
     const successfulDeploys: SuccessfulDeploy[] = pulls.map(deploy => {
         const lastCommit = deploy.commits.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
         const leadTime = (new Date(deploy.deployment.deployedAt).getTime() - new Date(lastCommit.timestamp).getTime()) / (1000 * 60);
-        console.log(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes repo: ${repository.name}`);
+        logger.info(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes repo: ${repository.name}`);
         return {
             pull: deploy.pullNumber,
             repo: repository.name,
@@ -52,19 +62,19 @@ function createDoraMetricsFromRepository(repository: Repository): {
                 //if time is less than a day, ignore and give it som time
                 const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
                 if (daysSinceDeploy < 2) {
-                    console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
+                    logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
                     return null;
                 }
-                console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
+                logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
                 return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
             }
             const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
             if (referencedDeploy === undefined) {
-                console.log(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
+                logger.info(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
                 return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
             }
             const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
-            console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
+            logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
             return {
                 pull: deploy.pullNumber,
                 repo: repository.name,
@@ -90,11 +100,11 @@ async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     const successfulDeploysTable = dataset.table('successful_deploys');
     const [successfulDeploysRows] = await successfulDeploysTable.getRows();
     const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull && row.repo === sd.repo));
-    console.log(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
+    logger.info(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
     const hotfixDeploysTable = dataset.table('hotfix_deploys');
     const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
     const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull && row.repo === hd.repo));
-    console.log(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
+    logger.info(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
 
 
 
@@ -109,31 +119,31 @@ async function ensureTable(tableName: string, schema: TableSchema, dataset: Data
     const [exists] = await table.exists();
     if (!exists) {
         await table.create({schema});
-        console.log(`Table ${tableName} created.`);
+        logger.info(`Table ${tableName} created.`);
     } else {
-        console.log(`Table ${tableName} already exists.`);
+        logger.info(`Table ${tableName} already exists.`);
     }
 }
 
 
 async function insertData(tableName: string, rows: RowMetadata[], dataset: Dataset) {
     if (rows.length === 0) {
-        console.log(`No new data to insert into ${tableName}.`);
+        logger.info(`No new data to insert into ${tableName}.`);
         return;
     }
     const table = dataset.table(tableName);
     try {
         await table.insert(rows);
-        console.log(`Inserted ${rows.length} rows into ${tableName}.`);
+        logger.info(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
         if (error.name === 'PartialFailureError' && Array.isArray(error.errors)) {
-            console.error(`Partial failure inserting into ${tableName}. Successful rows may exist.`);
+            logger.error(`Partial failure inserting into ${tableName}. Successful rows may exist.`);
             const failedDetails = error.errors.map((e: any) => ({
                 index: e.rowIndex ?? e.row?.__index ?? null,
                 reason: e.reason,
                 message: e.message
             }));
-            console.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
+            logger.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
         }
     }
 }

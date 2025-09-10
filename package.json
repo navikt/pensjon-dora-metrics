@@ -19,8 +19,10 @@
     "typescript-eslint": "^8.41.0"
   },
   "dependencies": {
+    "@elastic/ecs-winston-format": "^1.5.3",
     "@google-cloud/bigquery": "^8.1.1",
     "@octokit/core": "^7.0.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "winston": "^3.17.0"
   }
 }
