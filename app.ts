@@ -108,7 +108,7 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
         return rows[0] as SuccessfulDeploy;
     }
     logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
-    return null;
+    return undefined;
 }
 
 
