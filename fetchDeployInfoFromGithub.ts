@@ -14,6 +14,7 @@ const headers = {
 
 const owner = 'navikt';
 const repositories =['pensjon-pen','pensjon-psak'];
+
 const deploy_jobs = ['deploy pen to production', 'Deploy prod']
 
 async function getGithubData(repo:string): Promise<PullRequest[]> {
@@ -110,6 +111,7 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
         const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => deploy_jobs.includes(job.name))
 
         if(deploymentJob === undefined) {
+            console.log(jobs.data.jobs.map(job => job.name + " - " + job.conclusion).join("\n"));
             throw new Error("No deployment job found for pull request " + pull.number + " in repo " + repo);
         }
 
