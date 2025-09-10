@@ -4,6 +4,11 @@ export type GithubData = {
     repositories: Repository[];
 }
 
+export type User = {
+    username: string;
+    team: string;
+}
+
 export type Repository = {
     name: string;
     pulls: PullRequest[];

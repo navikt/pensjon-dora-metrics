@@ -1,6 +1,6 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
-import type {GithubData, PullRequest, Repository} from "./model";
+import type {GithubData, PullRequest, Repository, User} from "./model";
 import {findPullReference} from "./utils.ts";
 
 const token = process.env.GITHUB_TOKEN;
@@ -13,11 +13,28 @@ const headers = {
 }
 
 const owner = 'navikt';
-const repositories =['pensjon-pen','pensjon-psak'];
+const repositories = ['pensjon-pen', 'pensjon-psak'];
 
 const deploy_jobs = ['Deploy pen to production', 'Deploy prod']
 
-async function getGithubData(repo:string): Promise<PullRequest[]> {
+
+async function getTeamMembers(): Promise<User[]> {
+    const brukernavnoversikt = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+        owner: 'navikt',
+        repo: 'pensjon-github-to-slack-username',
+        path: 'brukernavnoversikt.csv',
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28'
+        }
+    });
+    const content = brukernavnoversikt.data as {content: string, encoding: string};
+    console.log(content)
+    return []
+}
+
+await getTeamMembers();
+
+async function getGithubData(repo: string): Promise<PullRequest[]> {
 
     const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner,
@@ -32,7 +49,7 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
 
         const isHotfix = pull.labels.map(label => label.name).includes("hotfix") || pull.head.ref.toLowerCase().startsWith("hotfix");
 
-        if(pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
+        if (pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
             //Add label if missing
             await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
                 owner,
@@ -77,12 +94,12 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
 
         const comments = reviewComments.concat(issueComments);
 
-        if(isHotfix) {
+        if (isHotfix) {
             const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || null;
-            if(referencedPull === null) {
+            if (referencedPull === null) {
                 //Ask for reference in a comment if not already asked
                 const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray:";
-                if(!comments.includes(body)) {
+                if (!comments.includes(body)) {
                     await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
                         owner,
                         repo: 'pensjon-pen',
@@ -94,7 +111,7 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
             }
         }
 
-        if(workflows.length === 0) {
+        if (workflows.length === 0) {
             //Not yet deployed
             return null;
         }
@@ -109,10 +126,10 @@ async function getGithubData(repo:string): Promise<PullRequest[]> {
         })
 
         const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => {
-            return deploy_jobs.some(deploy_job => job.name.toLowerCase().includes(deploy_job.toLowerCase()))
+            return deploy_jobs.some(deploy_job => job.name.toLowerCase().includes(deploy_job.toLowerCase()));
         })
 
-        if(deploymentJob === undefined) {
+        if (deploymentJob === undefined) {
             console.log("Workflow run: ", workflow.html_url);
             console.log("Jobs: ");
             console.log(jobs.data.jobs.map(job => job.name + " - " + job.conclusion).join("\n"));
