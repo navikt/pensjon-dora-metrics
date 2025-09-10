@@ -56,12 +56,12 @@ function createDoraMetricsFromRepository(repository: Repository): {
                     return null;
                 }
                 console.log(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
-                return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
+                return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
             }
             const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
             if (referencedDeploy === undefined) {
                 console.log(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
-                return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
+                return {pull: deploy.pullNumber, deployedAt: deploy.deployment.deployedAt, timeToRecovery: null};
             }
             const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
             console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
@@ -89,11 +89,11 @@ async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     //filter out entries that are already in the table
     const successfulDeploysTable = dataset.table('successful_deploys');
     const [successfulDeploysRows] = await successfulDeploysTable.getRows();
-    const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull));
+    const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull && row.repo === sd.repo));
     console.log(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
     const hotfixDeploysTable = dataset.table('hotfix_deploys');
     const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
-    const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull));
+    const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull && row.repo === hd.repo));
     console.log(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
 
 
