@@ -168,6 +168,9 @@ const githubData: GithubData = {
     repositories: repositoryData,
 }
 
-console.log(JSON.stringify(githubData, null, 2));
+console.log("Fetched data from GitHub:");
+githubData.repositories.forEach((repo) => {
+    console.log(`Repository: ${repo.name}, Pull Requests: ${repo.pulls.length}`);
+})
 
 fs.writeFileSync("github.json", JSON.stringify(githubData))
