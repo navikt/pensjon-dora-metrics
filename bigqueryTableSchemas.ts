@@ -4,6 +4,7 @@ export const schemaSuccessfulDeploys: TableSchema = {
     fields: [
         {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
         {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
+        {name: 'team', type: 'STRING', mode: 'NULLABLE'},
         {name: 'deployedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
         {name: 'leadTime', type: 'FLOAT', mode: 'REQUIRED'},
     ],
@@ -13,6 +14,7 @@ export const schemaHotfixDeploys: TableSchema = {
     fields: [
         {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
         {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
+        {name: 'team', type: 'STRING', mode: 'NULLABLE'},
         {name: 'deployedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
         {name: 'timeToRecovery', type: 'FLOAT', mode: 'NULLABLE'},
     ],

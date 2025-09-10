@@ -14,27 +14,12 @@ const headers = {
 
 const owner = 'navikt';
 const repositories = ['pensjon-pen', 'pensjon-psak'];
-
 const deploy_jobs = ['Deploy pen to production', 'Deploy prod']
 
 
-async function getTeamMembers(): Promise<User[]> {
-    const brukernavnoversikt = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-        owner: 'navikt',
-        repo: 'pensjon-github-to-slack-username',
-        path: 'brukernavnoversikt.csv',
-        headers: {
-            'X-GitHub-Api-Version': '2022-11-28'
-        }
-    });
-    const content = brukernavnoversikt.data as {content: string, encoding: string};
-    console.log(content)
-    return []
-}
+async function getGithubData(repo: string, teamMembers: User[]): Promise<PullRequest[]> {
 
-await getTeamMembers();
 
-async function getGithubData(repo: string): Promise<PullRequest[]> {
 
     const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner,
@@ -47,6 +32,7 @@ async function getGithubData(repo: string): Promise<PullRequest[]> {
 
     return (await Promise.all(pulls.data.filter(pull => pull.merged_at).map(async (pull) => {
 
+        const team = teamMembers.find(member => member.githubUsername.toLowerCase() === pull.user?.login.toLowerCase())?.team || null;
         const isHotfix = pull.labels.map(label => label.name).includes("hotfix") || pull.head.ref.toLowerCase().startsWith("hotfix");
 
         if (pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
@@ -139,6 +125,7 @@ async function getGithubData(repo: string): Promise<PullRequest[]> {
         return {
             pullNumber: pull.number,
             branch: pull.head.ref,
+            team: team,
             comments: comments,
             labels: pull.labels.map(label => label.name),
             mergedAt: pull.merged_at,
@@ -155,9 +142,36 @@ async function getGithubData(repo: string): Promise<PullRequest[]> {
     }))).filter(pr => pr !== null) as PullRequest[];
 }
 
+async function getTeamMembers(): Promise<User[]> {
+
+    const brukernavnoversikt = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+        owner: 'navikt',
+        repo: 'pensjon-github-to-slack-username',
+        path: 'brukernavnoversikt.csv',
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28'
+        },
+    });
+
+
+    const data = brukernavnoversikt.data as { content: string, encoding: string };
+    const csv = Buffer.from(data.content, 'base64').toString('utf-8');
+    const lines = csv.split('\n').slice(1); //Skip header
+    const users: User[] = lines.map(line => {
+        const [githubUsername, slackUser, slackMemberId, team] = line.split(',');
+        return {
+            githubUsername,
+            team,
+        } as User;
+    }).filter(user => user.githubUsername && user.team);
+    console.log(`Fetched ${users.length} users from pensjon-github-to-slack-username`);
+    return users;
+}
+
+const teamMembers = await getTeamMembers();
 
 const repositoryData: Repository[] = await Promise.all(repositories.map(async (name) => {
-    const pulls = await getGithubData(name);
+    const pulls = await getGithubData(name, teamMembers);
     return {
         name,
         pulls,

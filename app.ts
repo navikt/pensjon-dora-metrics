@@ -37,6 +37,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
         return {
             pull: deploy.pullNumber,
             repo: repository.name,
+            team: deploy.team,
             deployedAt: deploy.deployment.deployedAt,
             leadTime: leadTime.toFixed(2)
         };
@@ -67,6 +68,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
             return {
                 pull: deploy.pullNumber,
                 repo: repository.name,
+                team: deploy.team,
                 deployedAt: deploy.deployment.deployedAt,
                 timeToRecovery: timeToRecovery.toFixed(2)
             };
