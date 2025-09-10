@@ -123,17 +123,16 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
     }
     const table = dataset.table(tableName);
     try {
-        const response = await table.insert(rows);
-        response.forEach(res => {
-            if ('errors' in res && res.errors) {
-                console.error(`Error inserting row into ${tableName}:`, res.errors);
-            }
-        });
+        //Handle errors for individual rows
+        //https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-json#handling_errors
+
+        const response = await table.insert(rows, {ignoreUnknownValues: true, skipInvalidRows: true});
+        console.log("insert response: ", JSON.stringify(response))
+
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
         console.error(`Error inserting data into ${tableName}:`, error);
     }
-    console.log(rows)
 }
 
 function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset: Dataset } {
