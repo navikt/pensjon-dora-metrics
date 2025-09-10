@@ -20,7 +20,7 @@ const {successfulDeploys, hotfixDeploys} = repositories.reduce(
     {successfulDeploys: [] as SuccessfulDeploy[], hotfixDeploys: [] as HotfixDeploy[]}
 );
 
-pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
+await pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
 
 
 function createDoraMetricsFromRepository(repository: Repository): {
@@ -78,7 +78,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
 }
 
 
-function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
+async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     successfulDeploys: SuccessfulDeploy[],
     hotfixDeploys: HotfixDeploy[],
     dataset: Dataset
@@ -131,7 +131,7 @@ function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset:
     const bigqueryClient = new BigQuery();
     const dataset = bigqueryClient.dataset(datasetKey);
 
-    BIGQUERY_TABLE_SCHEMAS.forEach(({name, schema}) => {
+    BIGQUERY_TABLE_SCHEMAS.forEach(async ({name, schema}) => {
         await ensureTable(name, schema, dataset);
     })
 
