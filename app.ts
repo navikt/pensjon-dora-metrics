@@ -123,15 +123,11 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
     }
     const table = dataset.table(tableName);
     try {
-        //Handle errors for individual rows
-        //https://cloud.google.com/bigquery/docs/loading-data-cloud-storage-json#handling_errors
-
-        const response = await table.insert(rows);
-        console.log("insert response: ", JSON.stringify(response))
-
+        await table.insert(rows);
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
         console.error(`Error inserting data into ${tableName}:`, error);
+        console.log(JSON.stringify(error))
     }
 }
 
