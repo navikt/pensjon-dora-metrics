@@ -33,7 +33,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
     const successfulDeploys: SuccessfulDeploy[] = pulls.map(deploy => {
         const lastCommit = deploy.commits.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
         const leadTime = (new Date(deploy.deployment.deployedAt).getTime() - new Date(lastCommit.timestamp).getTime()) / (1000 * 60);
-        console.log(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes`);
+        console.log(`Successful deploy PR #${deploy.pullNumber} lead time: ${leadTime.toFixed(2)} minutes repo: ${repository.name}`);
         return {
             pull: deploy.pullNumber,
             repo: repository.name,
@@ -64,7 +64,7 @@ function createDoraMetricsFromRepository(repository: Repository): {
                 return {pull: deploy.pullNumber, timestamp: deploy.deployment.deployedAt, timeToRecovery: null};
             }
             const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
-            console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull})`);
+            console.log(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
             return {
                 pull: deploy.pullNumber,
                 repo: repository.name,
@@ -96,6 +96,8 @@ async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull));
     console.log(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
 
+
+
     //insert only new rows
     await insertData('successful_deploys', successfulDeploysToInsert, dataset);
     await insertData('hotfix_deploys', hotfixDeploysToInsert, dataset);
@@ -125,6 +127,12 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
         console.error(`Error inserting data into ${tableName}:`, error);
+        //log errors for each row BigQuery
+        if (error instanceof Array) {
+            error.forEach(err => {
+                console.error(`Error for row ${JSON.stringify(err.row)}: ${err.message}`);
+            });
+        }
     }
 }
 
