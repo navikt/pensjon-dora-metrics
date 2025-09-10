@@ -9,16 +9,19 @@ import {logger} from "./logger.ts";
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
-const successfulDeploys: SuccessfulDeploy[] = [];
-const hotfixDeploys: HotfixDeploy[] = [];
-for (const repository of repositories) {
-    const {successfulDeploys: s, hotfixDeploys: h} = await createDoraMetricsFromRepository(repository, dataset);
-    successfulDeploys.push(...s);
-    hotfixDeploys.push(...h);
-}
-
+const {successfulDeploys, hotfixDeploys} = await processRepositories(repositories)
 await pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
 
+async function processRepositories(repositories: Repository[]): Promise<{successfulDeploys: SuccessfulDeploy[], hotfixDeploys: HotfixDeploy[]}> {
+    const successfulDeploys: SuccessfulDeploy[] = [];
+    const hotfixDeploys: HotfixDeploy[] = [];
+    for (const repository of repositories) {
+        const {successfulDeploys: s, hotfixDeploys: h} = await createDoraMetricsFromRepository(repository, dataset);
+        successfulDeploys.push(...s);
+        hotfixDeploys.push(...h);
+    }
+    return {successfulDeploys, hotfixDeploys};
+}
 
 async function createDoraMetricsFromRepository(repository: Repository, dataset: Dataset): Promise<{
     successfulDeploys: SuccessfulDeploy[];
