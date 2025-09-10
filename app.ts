@@ -9,23 +9,21 @@ import {logger} from "./logger.ts";
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
-const {successfulDeploys, hotfixDeploys} = repositories.reduce(
-    (acc, repository) => {
-        const {successfulDeploys: s, hotfixDeploys: h} = createDoraMetricsFromRepository(repository);
-        acc.successfulDeploys.push(...s);
-        acc.hotfixDeploys.push(...h);
-        return acc;
-    },
-    {successfulDeploys: [] as SuccessfulDeploy[], hotfixDeploys: [] as HotfixDeploy[]}
-);
+const successfulDeploys: SuccessfulDeploy[] = [];
+const hotfixDeploys: HotfixDeploy[] = [];
+for (const repository of repositories) {
+    const {successfulDeploys: s, hotfixDeploys: h} = await createDoraMetricsFromRepository(repository, dataset);
+    successfulDeploys.push(...s);
+    hotfixDeploys.push(...h);
+}
 
 await pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
 
 
-function createDoraMetricsFromRepository(repository: Repository): {
-    successfulDeploys: SuccessfulDeploy[],
-    hotfixDeploys: HotfixDeploy[]
-} {
+async function createDoraMetricsFromRepository(repository: Repository, dataset: Dataset): Promise<{
+    successfulDeploys: SuccessfulDeploy[];
+    hotfixDeploys: HotfixDeploy[];
+}> {
 
     const {pulls} = repository;
 
@@ -42,50 +40,71 @@ function createDoraMetricsFromRepository(repository: Repository): {
         };
     })
 
-    const hotfixDeploys: HotfixDeploy[] = pulls
-        .filter(pr => pr.labels.includes("hotfix") || pr.branch.toLowerCase().startsWith("hotfix"))
-        .map(deploy => {
-            const hotfixPull = findPullReference(deploy.comments) || findPullReference(deploy.commits.map(c => c.message)) || null;
-            if (hotfixPull === null) {
+    const hotfixDeploys: HotfixDeploy[] =
+        (await Promise.all(
+            pulls
+                .filter(pr => pr.labels.includes("hotfix") || pr.branch.toLowerCase().startsWith("hotfix"))
+                .map(async deploy => {
+                    const pullRequestThatIntroducedFailure = findPullReference(deploy.comments) || findPullReference(deploy.commits.map(c => c.message)) || null;
+                    if (pullRequestThatIntroducedFailure === null) {
 
-                //if time is less than a day, ignore and give it som time
-                const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
-                if (daysSinceDeploy < 2) {
-                    logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
-                    return null;
-                }
-                logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
-                return {
-                    pull: deploy.pullNumber,
-                    repo: repository.name,
-                    deployedAt: deploy.deployment.deployedAt,
-                    timeToRecovery: null
-                };
-            }
-            const referencedDeploy = successfulDeploys.find(pr => pr.pull === hotfixPull);
-            if (referencedDeploy === undefined) {
-                logger.warn(`Hotfix deploy PR #${deploy.pullNumber} references PR #${hotfixPull} which is not in list of successful deploys.`);
-                return {
-                    pull: deploy.pullNumber,
-                    repo: repository.name,
-                    deployedAt: deploy.deployment.deployedAt,
-                    timeToRecovery: null
-                };
-            }
-            const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
-            logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${hotfixPull}) repo: ${repository.name}`);
-            return {
-                pull: deploy.pullNumber,
-                repo: repository.name,
-                team: deploy.team,
-                deployedAt: deploy.deployment.deployedAt,
-                timeToRecovery: timeToRecovery.toFixed(2)
-            };
-        }).filter(deploy => deploy !== null) as HotfixDeploy[];
+                        //if time is less than a day, ignore and give it som time
+                        const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
+                        if (daysSinceDeploy < 2) {
+                            logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
+                            return null;
+                        }
+                        logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
+                        return {
+                            pull: deploy.pullNumber,
+                            repo: repository.name,
+                            deployedAt: deploy.deployment.deployedAt,
+                            timeToRecovery: null
+                        };
+                    }
+                    const referencedDeploy = successfulDeploys.find(pr => pr.pull === pullRequestThatIntroducedFailure) || await getExistingSuccesfulDeployFromBigQuery(dataset, pullRequestThatIntroducedFailure, repository.name);
+                    if (referencedDeploy === undefined) {
+                        logger.warn(`Hotfix deploy PR #${deploy.pullNumber} references PR #${pullRequestThatIntroducedFailure} which is not in list of successful deploys.`);
+                        return {
+                            pull: deploy.pullNumber,
+                            repo: repository.name,
+                            deployedAt: deploy.deployment.deployedAt,
+                            timeToRecovery: null
+                        };
+                    }
+                    const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
+                    logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${pullRequestThatIntroducedFailure}) repo: ${repository.name}`);
+                    return {
+                        pull: deploy.pullNumber,
+                        repo: repository.name,
+                        team: deploy.team,
+                        deployedAt: deploy.deployment.deployedAt,
+                        timeToRecovery: timeToRecovery.toFixed(2)
+                    };
+                })
+        )).filter(deploy => deploy !== null) as HotfixDeploy[];
     return {
         successfulDeploys,
         hotfixDeploys,
     }
+}
+
+async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
+    const table = dataset.table('successful_deploys');
+    const query = `SELECT *
+                   FROM \`${table.id}\`
+                   WHERE pull = @pull
+                     AND repo = @repo LIMIT 1`;
+    const options = {
+        query: query,
+        params: {pull, repo},
+    };
+    const [job] = await dataset.bigQuery.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+    if (rows.length > 0) {
+        return rows[0] as SuccessfulDeploy;
+    }
+    return null;
 }
 
 
