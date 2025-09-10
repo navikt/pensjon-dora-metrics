@@ -123,17 +123,17 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
     }
     const table = dataset.table(tableName);
     try {
-        await table.insert(rows);
+        const response = await table.insert(rows);
+        response.forEach(res => {
+            if ('errors' in res && res.errors) {
+                console.error(`Error inserting row into ${tableName}:`, res.errors);
+            }
+        });
         console.log(`Inserted ${rows.length} rows into ${tableName}.`);
     } catch (error) {
         console.error(`Error inserting data into ${tableName}:`, error);
-        //log errors for each row BigQuery
-        if (error instanceof Array) {
-            error.forEach(err => {
-                console.error(`Error for row ${JSON.stringify(err.row)}: ${err.message}`);
-            });
-        }
     }
+    console.log(rows)
 }
 
 function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset: Dataset } {
