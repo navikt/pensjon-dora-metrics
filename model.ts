@@ -29,6 +29,7 @@ export type PullRequest = {
     labels: string[];
     commits: Commit[];
     deployment: Deployment
+    referencedPull: number | null;
 }
 
 export type Commit = {

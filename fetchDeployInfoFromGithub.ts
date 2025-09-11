@@ -73,12 +73,12 @@ async function getGithubData(repo: string, workflowName: string, deployJob: stri
         })).data.map(comment => comment.body);
 
         const comments = reviewComments.concat(issueComments);
+        const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || findPullReference(pull.body) || null;
 
         if (isHotfix) {
-            const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || findPullReference(pull.body) || null;
             if (referencedPull === null) {
                 //Ask for reference in a comment if not already asked
-                const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray:";
+                const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray: ";
                 if (!comments.includes(body)) {
                     await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
                         owner,
@@ -124,6 +124,7 @@ async function getGithubData(repo: string, workflowName: string, deployJob: stri
             labels: pull.labels.map(label => label.name),
             mergedAt: pull.merged_at,
             title: pull.title,
+            referencedPull: referencedPull,
             commits: commits.data.map(commit => ({
                 message: commit.commit.message,
                 timestamp: commit.commit.author?.date,
@@ -180,5 +181,5 @@ console.log("Fetched data from GitHub:");
 githubData.repositories.forEach((repo) => {
     console.log(`Repository: ${repo.name}, Pull Requests: ${repo.pulls.length}`);
 })
-
+console.log(JSON.stringify(githubData));
 fs.writeFileSync("github.json", JSON.stringify(githubData))
