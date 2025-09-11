@@ -98,7 +98,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
 async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
     const table = dataset.table('successful_deploys');
     const gcpTeamProjectId = 'pesys-felles-prod-2e54';
-    const tableRef = `\`${gcpTeamProjectId}.${dataset.id}.${table.id}\``;
+    const tableRef = `${gcpTeamProjectId}.${dataset.id}.${table.id}`;
     const query = `SELECT *
                    FROM ${tableRef}
                    WHERE pull = @pull
@@ -114,11 +114,11 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
     const [job] = await dataset.bigQuery.createQueryJob(options);
     // Wait for the query to finish
     const [rows] = await job.getQueryResults();
-
+    logger.info(rows)
     // If we found a row, return it and map to SuccessfulDeploy
     if (rows.length > 0) {
         const row = rows[0];
-        logger.info("row: ",JSON.stringify(row))
+        logger.error("row: ",JSON.stringify(row))
         return {
             pull: row.pull,
             repo: row.repo,
@@ -129,8 +129,14 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
     }
 
   } catch (error) {
-      logger.error("Error querying BigQuery for existing successful deploy: " + error);
-      return null;
+      if (error?.errors[0]?.errors) {
+          logger.error('Error:', error.errors[0].errors);
+      } else if (error?.errors[0]?.message) {
+          logger.error('Error:', error.errors[0].message);
+      } else {
+          logger.error('Error:', error);
+      }
+      throw new Error(error);
   }
 
     logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
