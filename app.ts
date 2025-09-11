@@ -99,7 +99,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
 
 async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
     const table = dataset.table('successful_deploys');
-    const gcpTeamProjectId = process.env.GCP_TEAM_PROJECT_ID
+    const gcpTeamProjectId = 'pesys-felles-prod-2e54';
     const tableRef = `\`${gcpTeamProjectId}.${dataset.id}.${table.id}\``;
     const query = `SELECT *
                    FROM ${tableRef}
@@ -109,7 +109,7 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
         query: query,
         params: {pull, repo},
     };
-    logger.info("gcp",gcpTeamProjectId);
+
 
   try {
 
