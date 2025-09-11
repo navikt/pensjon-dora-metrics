@@ -12,7 +12,10 @@ const {repositories} = getGithubDataFromFile('github.json')
 const {successfulDeploys, hotfixDeploys} = await processRepositories(repositories)
 await pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
 
-async function processRepositories(repositories: Repository[]): Promise<{successfulDeploys: SuccessfulDeploy[], hotfixDeploys: HotfixDeploy[]}> {
+async function processRepositories(repositories: Repository[]): Promise<{
+    successfulDeploys: SuccessfulDeploy[],
+    hotfixDeploys: HotfixDeploy[]
+}> {
     const successfulDeploys: SuccessfulDeploy[] = [];
     const hotfixDeploys: HotfixDeploy[] = [];
     for (const repository of repositories) {
@@ -103,42 +106,38 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
                    FROM ${tableRef}
                    WHERE pull = @pull
                      AND repo = @repo LIMIT 1`;
-    logger.info("query: ", query);
     const options = {
         query: query,
         params: {pull, repo},
     };
 
 
-  try {
+    try {
 
-    const [job] = await dataset.bigQuery.createQueryJob(options);
-    // Wait for the query to finish
-    const [rows] = await job.getQueryResults();
-    logger.info(rows)
-    // If we found a row, return it and map to SuccessfulDeploy
-    if (rows.length > 0) {
-        const row = rows[0];
-        console.error("row: ",JSON.stringify(row))
-        return {
-            pull: row.pull,
-            repo: row.repo,
-            team: row.team,
-            deployedAt: row.deployedAt,
-            leadTime: row.leadTime,
-        };
+        const [job] = await dataset.bigQuery.createQueryJob(options);
+        const [rows] = await job.getQueryResults();
+        logger.info(rows)
+        if (rows.length > 0) {
+            const row = rows[0];
+            return {
+                pull: row.pull,
+                repo: row.repo,
+                team: row.team,
+                deployedAt: row.deployedAt.value,
+                leadTime: row.leadTime,
+            };
+        }
+
+    } catch (error) {
+        if (error?.errors[0]?.errors) {
+            logger.error('Error:', error.errors[0].errors);
+        } else if (error?.errors[0]?.message) {
+            logger.error('Error:', error.errors[0].message);
+        } else {
+            logger.error('Error:', error);
+        }
+        throw error;
     }
-
-  } catch (error) {
-      if (error?.errors[0]?.errors) {
-          logger.error('Error:', error.errors[0].errors);
-      } else if (error?.errors[0]?.message) {
-          logger.error('Error:', error.errors[0].message);
-      } else {
-          logger.error('Error:', error);
-      }
-      throw new Error(error);
-  }
 
     logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
     return undefined;
