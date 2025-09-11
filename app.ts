@@ -5,6 +5,9 @@ import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 
+//Bigquery project id
+process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'nav-dev';
+
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
@@ -185,8 +188,8 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
 }
 
 function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset: Dataset } {
-
-    const bigqueryClient = new BigQuery();
+    const gcpTeamProjectId = process.env.GCP_TEAM_PROJECT_ID
+    const bigqueryClient = new BigQuery({projectId: gcpTeamProjectId});
     const dataset = bigqueryClient.dataset(datasetKey);
 
     BIGQUERY_TABLE_SCHEMAS.forEach(async ({name, schema}) => {
