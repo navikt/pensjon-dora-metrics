@@ -99,7 +99,8 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
 
 async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
     const table = dataset.table('successful_deploys');
-    const tableRef = `\`${dataset.id}.${table.id}\``;
+    const gcpTeamProjectId = process.env.GCP_TEAM_PROJECT_ID
+    const tableRef = `\`${gcpTeamProjectId}.${dataset.id}.${table.id}\``;
     const query = `SELECT *
                    FROM ${tableRef}
                    WHERE pull = @pull
@@ -108,6 +109,10 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
         query: query,
         params: {pull, repo},
     };
+    logger.info("gcp",gcpTeamProjectId);
+
+  try {
+
     const [job] = await dataset.bigQuery.createQueryJob(options);
     // Wait for the query to finish
     const [rows] = await job.getQueryResults();
@@ -115,7 +120,7 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
     // If we found a row, return it and map to SuccessfulDeploy
     if (rows.length > 0) {
         const row = rows[0];
-        console.log(JSON.stringify(row))
+        logger.info("row: ",JSON.stringify(row))
         return {
             pull: row.pull,
             repo: row.repo,
@@ -124,6 +129,11 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
             leadTime: row.leadTime,
         };
     }
+
+  } catch (error) {
+      logger.error("Error querying BigQuery for existing successful deploy: " + error);
+      return null;
+  }
 
     logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
     return undefined;
@@ -188,8 +198,7 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
 }
 
 function setupBiqQuery(datasetKey: string): { bigqueryClient: BigQuery, dataset: Dataset } {
-    const gcpTeamProjectId = process.env.GCP_TEAM_PROJECT_ID
-    const bigqueryClient = new BigQuery({projectId: gcpTeamProjectId});
+    const bigqueryClient = new BigQuery();
     const dataset = bigqueryClient.dataset(datasetKey);
 
     BIGQUERY_TABLE_SCHEMAS.forEach(async ({name, schema}) => {
