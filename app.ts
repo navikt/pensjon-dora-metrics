@@ -1,6 +1,5 @@
 import fs from 'fs';
 import type {GithubData, HotfixDeploy, Repository, SuccessfulDeploy} from "./model.ts";
-import {findPullReference} from "./utils.ts";
 import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
@@ -59,6 +58,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
                         logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
                         return {
                             pull: deploy.pullNumber,
+                            referencedPull: deploy.referencedPull,
                             repo: repository.name,
                             deployedAt: deploy.deployment.deployedAt,
                             timeToRecovery: null
@@ -69,15 +69,17 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
                         logger.warn(`Hotfix deploy PR #${deploy.pullNumber} references PR #${deploy.referencedPull} which is not in list of successful deploys.`);
                         return {
                             pull: deploy.pullNumber,
+                            referencedPull: deploy.referencedPull,
                             repo: repository.name,
                             deployedAt: deploy.deployment.deployedAt,
                             timeToRecovery: null
                         };
                     }
-                    const timeToRecovery = (new Date(referencedDeploy.deployedAt).getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60);
+                    const timeToRecovery = (new Date(deploy.deployment.deployedAt).getTime() - new Date(referencedDeploy.deployedAt).getTime()) / (1000 * 60);
                     logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${deploy.referencedPull}) repo: ${repository.name}`);
                     return {
                         pull: deploy.pullNumber,
+                        referencedPull: deploy.referencedPull,
                         repo: repository.name,
                         team: deploy.team,
                         deployedAt: deploy.deployment.deployedAt,

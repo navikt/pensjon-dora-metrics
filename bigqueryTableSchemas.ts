@@ -13,6 +13,7 @@ export const schemaSuccessfulDeploys: TableSchema = {
 export const schemaHotfixDeploys: TableSchema = {
     fields: [
         {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
+        {name: 'referencedPull', type: 'INTEGER', mode: 'NULLABLE'},
         {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
         {name: 'team', type: 'STRING', mode: 'NULLABLE'},
         {name: 'deployedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},

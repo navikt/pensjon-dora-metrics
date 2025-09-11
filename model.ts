@@ -52,6 +52,7 @@ export type SuccessfulDeploy = {
 
 export type HotfixDeploy = {
     pull: number;
+    referencedPull: number | null;
     repo: string;
     team: string | null;
     deployedAt: string;
