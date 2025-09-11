@@ -119,7 +119,7 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
     // If we found a row, return it and map to SuccessfulDeploy
     if (rows.length > 0) {
         const row = rows[0];
-        logger.error("row: ",JSON.stringify(row))
+        console.error("row: ",JSON.stringify(row))
         return {
             pull: row.pull,
             repo: row.repo,
