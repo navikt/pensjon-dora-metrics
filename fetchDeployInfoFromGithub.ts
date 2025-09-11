@@ -1,6 +1,6 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
-import type {GithubData, PullRequest, Repository, RepostioryToFetch, User} from "./model";
+import type {GithubData, PullRequest, Repository, User} from "./model";
 import {findPullReference} from "./utils.ts";
 import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
 

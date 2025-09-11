@@ -76,6 +76,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
                         };
                     }
                     const timeToRecovery = (new Date(deploy.deployment.deployedAt).getTime() - new Date(referencedDeploy.deployedAt).getTime()) / (1000 * 60);
+                    logger.info(`Deploy dates: referenced PR #${referencedDeploy.pull} deployed at ${referencedDeploy.deployedAt}, hotfix PR #${deploy.pullNumber} deployed at ${deploy.deployment.deployedAt}`);
                     logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${deploy.referencedPull}) repo: ${repository.name}`);
                     return {
                         pull: deploy.pullNumber,
