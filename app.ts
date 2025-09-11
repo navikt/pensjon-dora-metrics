@@ -106,12 +106,21 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
         params: {pull, repo},
     };
     const [job] = await dataset.bigQuery.createQueryJob(options);
+    // Wait for the query to finish
     const [rows] = await job.getQueryResults();
+
+    // If we found a row, return it and map to SuccessfulDeploy
     if (rows.length > 0) {
-        logger.info("Found existing successful deploy in BigQuery for PR #" + pull + " in repo " + repo);
-        logger.info("Raw object from BigQuery:", JSON.stringify(rows));
-        return rows[0] as SuccessfulDeploy;
+        const row = rows[0];
+        return {
+            pull: row.pull,
+            repo: row.repo,
+            team: row.team,
+            deployedAt: row.deployedAt,
+            leadTime: row.leadTime,
+        };
     }
+
     logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
     return undefined;
 }
