@@ -6,8 +6,6 @@ import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 
 //Bigquery project id
-process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'nav-dev';
-
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
