@@ -72,6 +72,10 @@ async function getGithubData(repo: string, workflowName: string, deployJob: stri
             headers,
         })).data.map(comment => comment.body);
 
+        if(pull.number === 1905) {
+            console.log(JSON.stringify(pull))
+        }
+
         const comments = reviewComments.concat(issueComments);
         const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || findPullReference(pull.body) || null;
 

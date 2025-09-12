@@ -5,7 +5,6 @@ import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 
-//Bigquery project id
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
@@ -26,7 +25,7 @@ async function processRepositories(repositories: Repository[]): Promise<{
     return {successfulDeploys, hotfixDeploys};
 }
 
-async function createDoraMetricsFromRepository(repository: Repository, dataset: Dataset): Promise<{
+export async function createDoraMetricsFromRepository(repository: Repository, dataset: Dataset): Promise<{
     successfulDeploys: SuccessfulDeploy[];
     hotfixDeploys: HotfixDeploy[];
 }> {
@@ -64,6 +63,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
                             pull: deploy.pullNumber,
                             referencedPull: deploy.referencedPull,
                             repo: repository.name,
+                            team: deploy.team,
                             deployedAt: deploy.deployment.deployedAt,
                             timeToRecovery: null
                         };
@@ -75,6 +75,7 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
                             pull: deploy.pullNumber,
                             referencedPull: deploy.referencedPull,
                             repo: repository.name,
+                            team: deploy.team,
                             deployedAt: deploy.deployment.deployedAt,
                             timeToRecovery: null
                         };
@@ -98,10 +99,9 @@ async function createDoraMetricsFromRepository(repository: Repository, dataset: 
     }
 }
 
-async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
+export async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
     const table = dataset.table('successful_deploys');
-    const gcpTeamProjectId = 'pesys-felles-prod-2e54';
-    const tableRef = `\`${gcpTeamProjectId}.${dataset.id}.${table.id}\``;
+    const tableRef = `\`${dataset.id}.${table.id}\``;
     const query = `SELECT *
                    FROM ${tableRef}
                    WHERE pull = @pull
@@ -110,7 +110,6 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
         query: query,
         params: {pull, repo},
     };
-
 
     try {
 
@@ -144,28 +143,22 @@ async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: nu
 }
 
 
-async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
+export async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     successfulDeploys: SuccessfulDeploy[],
     hotfixDeploys: HotfixDeploy[],
     dataset: Dataset
 }) {
 
-    //filter out entries that are already in the table
-    const successfulDeploysTable = dataset.table('successful_deploys');
-    const [successfulDeploysRows] = await successfulDeploysTable.getRows();
-    const successfulDeploysToInsert = successfulDeploys.filter(sd => !successfulDeploysRows.some(row => row.pull === sd.pull && row.repo === sd.repo));
+    const successfulDeploysToInsert = await filterNewRows('successful_deploys', successfulDeploys, dataset);
     logger.info(`Filtered successful deploys to insert: ${successfulDeploysToInsert.length} out of ${successfulDeploys.length}`);
-    const hotfixDeploysTable = dataset.table('hotfix_deploys');
-    const [hotfixDeploysRows] = await hotfixDeploysTable.getRows();
-    const hotfixDeploysToInsert = hotfixDeploys.filter(hd => !hotfixDeploysRows.some(row => row.pull === hd.pull && row.repo === hd.repo));
+
+    const hotfixDeploysToInsert = await filterNewRows('hotfix_deploys', hotfixDeploys, dataset);
     logger.info(`Filtered hotfix deploys to insert: ${hotfixDeploysToInsert.length} out of ${hotfixDeploys.length}`);
 
-
-    //insert only new rows
     await insertData('successful_deploys', successfulDeploysToInsert, dataset);
     await insertData('hotfix_deploys', hotfixDeploysToInsert, dataset);
-
 }
+
 
 async function ensureTable(tableName: string, schema: TableSchema, dataset: Dataset) {
     const table = dataset.table(tableName);
@@ -176,6 +169,24 @@ async function ensureTable(tableName: string, schema: TableSchema, dataset: Data
     } else {
         logger.info(`Table ${tableName} already exists.`);
     }
+}
+
+
+export async function filterNewRows<T extends SuccessfulDeploy | HotfixDeploy>(tableName: string, rows: T[], dataset: Dataset): Promise<T[]> {
+    if (rows.length === 0) return [];
+
+    const tableRef = `\`${dataset.id}.${tableName}\``;
+
+    const keys = rows.map(r => ({pull: r.pull, repo: r.repo}));
+    const query = `SELECT t.pull, t.repo
+                   FROM ${tableRef} t
+                            JOIN UNNEST(@keys) k ON t.pull = k.pull AND t.repo = k.repo`;
+
+    const [job] = await dataset.bigQuery.createQueryJob({query, params: {keys}});
+    const [existing] = await job.getQueryResults();
+    const existingSet = new Set(existing.map((r: { pull: number; repo: string }) => `${r.pull}::${r.repo}`));
+
+    return rows.filter(r => !existingSet.has(`${r.pull}::${r.repo}`));
 }
 
 
@@ -191,7 +202,7 @@ async function insertData(tableName: string, rows: RowMetadata[], dataset: Datas
     } catch (error) {
         if (error.name === 'PartialFailureError' && Array.isArray(error.errors)) {
             logger.error(`Partial failure inserting into ${tableName}. Successful rows may exist.`);
-            const failedDetails = error.errors.map((e: any) => (e));
+            const failedDetails = error.errors.map((e: Partial<RowMetadata>) => (e));
             logger.error(`Failed row details: ${JSON.stringify(failedDetails, null, 2)}`);
             logger.error(JSON.stringify(error))
         } else {

@@ -5,4 +5,4 @@ RUN npm install
 COPY . .
 RUN --mount=type=secret,id=github_token,required=true,env=GITHUB_TOKEN \
     node fetchDeployInfoFromGithub.ts
-CMD ["node", "app.ts"]
+CMD ["node", "job.ts"]
