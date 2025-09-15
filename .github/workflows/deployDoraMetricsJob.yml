@@ -22,10 +22,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Fetch repository metadata cache
-        uses: actions/download-artifact@v5
+      - name: Restore repositoryCache.json
+        uses: actions/cache/restore@v4
         with:
-          name: repository-cache
+          path: repositoryCache.json
+          key: repositoryCache
 
       - name: Build and push Docker image
         uses: nais/docker-build-push@v0
@@ -43,10 +44,8 @@ jobs:
           CLUSTER: prod-gcp
           RESOURCE: .nais/dora-naisjob.yml
 
-      - name: 'Cache respository metadata'
-        uses: actions/upload-artifact@v4
+      - name: Cache repositoryCache.json
+        uses: actions/cache/save@v4
         with:
-          name: repository-cache
-          path: repositoryCache.json
-          retention-days: 5
-
+            path: ~/repositoryCache.json
+            key: repositoryCache
