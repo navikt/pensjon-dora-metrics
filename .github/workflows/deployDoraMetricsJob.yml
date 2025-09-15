@@ -47,5 +47,5 @@ jobs:
       - name: Cache repositoryCache.json
         uses: actions/cache/save@v4
         with:
-            path: ~/repositoryCache.json
+            path: repositoryCache.json
             key: repositoryCache
