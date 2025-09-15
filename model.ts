@@ -58,3 +58,9 @@ export type HotfixDeploy = {
     deployedAt: string;
     timeToRecovery: string | null;
 }
+
+export type RepositoryCache = {
+    repo: string
+    latestPullRequest: number;
+    hasUnreferencedHotfix: boolean;
+}
