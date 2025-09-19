@@ -27,4 +27,5 @@ spec:
     outbound:
       rules:
         - application: jira-proxy
+          namespace: pesys-felles
           cluster: prod-fss
