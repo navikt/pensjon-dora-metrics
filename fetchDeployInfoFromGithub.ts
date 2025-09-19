@@ -182,7 +182,7 @@ async function getTeamMembers(): Promise<User[]> {
             team,
         } as User;
     }).filter(user => user.githubUsername && user.team);
-    console.log(`Fetched ${users.length} users from pensjon-github-to-slack-username`);<
+    console.log(`Fetched ${users.length} users from pensjon-github-to-slack-username`);
     return users;
 }
 
