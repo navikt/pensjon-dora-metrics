@@ -5,6 +5,12 @@ import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 
+
+//Selftest for jira-proxy
+const isalive = await fetch("https://jira-proxy.nais.adeo.no")
+
+console.log("JiraProxy isAlive??",isalive.body)
+
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 

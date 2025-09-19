@@ -20,3 +20,11 @@ spec:
       destinations:
         - id: elastic
         - id: loki
+  azure:
+    application:
+      enabled: true
+  accessPolicy:
+    outbound:
+      rules:
+        - application: jira-proxy
+          cluster: prod-fss
