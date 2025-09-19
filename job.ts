@@ -7,7 +7,7 @@ import {logger} from "./logger.ts";
 
 
 //Selftest for jira-proxy
-const isalive = await fetch("https://jira-proxy.intern.nav.no/isalive")
+const isalive = await fetch("https://jira-proxy.intern.nav.no:8080/isalive")
 
 console.log("JiraProxy isAlive??",isalive.body)
 
