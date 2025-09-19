@@ -7,9 +7,11 @@ import {logger} from "./logger.ts";
 
 
 //Selftest for jira-proxy
-const isalive = await fetch("https://jira-proxy.prod-fss-pub.nais.io/isalive")
+//const isalive = await fetch("https://jira-proxy.prod-fss-pub.nais.io/isalive")
 
-console.log("JiraProxy isAlive??",isalive.body)
+//const text = await isalive.text()
+
+//console.log("JiraProxy isAlive??",text)
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
