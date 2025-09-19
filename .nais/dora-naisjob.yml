@@ -25,7 +25,5 @@ spec:
       enabled: true
   accessPolicy:
     outbound:
-      rules:
-        - application: jira-proxy
-          namespace: pesys-felles
-          cluster: prod-fss
+      external:
+        - host: jira-proxy.prod-fss-pub.nais.io
