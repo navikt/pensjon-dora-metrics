@@ -1,7 +1,7 @@
 
 
 export const getTexasClientCredentialsToken = async ( scope: string): Promise<TexasTokenResponse> => {
-    const url = process.env.TEXAS_TOKEN_ENDPOINT;
+    const url = process.env.NAIS_TOKEN_ENDPOINT;
     const response = await fetch(url, {
         headers: {
             'Content-Type': 'application/json',
