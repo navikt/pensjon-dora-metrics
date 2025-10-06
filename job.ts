@@ -6,6 +6,11 @@ import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 import {getTexasClientCredentialsToken} from "./texasClient.ts";
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+await sleep(25000) //Wait for secrets to be available
 
 //Selftest for jira-proxy
 const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8080", {
@@ -13,6 +18,11 @@ const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8
         Authorization: `Bearer ${ (await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.jira-proxy/.default")).access_token}`
     }
 })
+
+if(!test.ok) {
+    console.log("JiraProxy isAlive??",test.status,test.statusText)
+    throw new Error("JiraProxy is not reachable")
+}
 
 const text = await test.text()
 
