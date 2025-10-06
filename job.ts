@@ -4,14 +4,19 @@ import {BigQuery, Dataset} from "@google-cloud/bigquery";
 import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
+import {getTexasClientCredentialsToken} from "./texasClient.ts";
 
 
 //Selftest for jira-proxy
-//const isalive = await fetch("https://jira-proxy.prod-fss-pub.nais.io/isalive")
+const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8080", {
+    headers: {
+        Authorization: `Bearer ${ (await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.jira-proxy/.default")).access_token}`
+    }
+})
 
-//const text = await isalive.text()
+const text = await test.text()
 
-//console.log("JiraProxy isAlive??",text)
+console.log("JiraProxy isAlive??",text)
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')

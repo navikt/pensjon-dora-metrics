@@ -22,7 +22,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
         owner,
         repo,
         state: 'closed',
-        per_page: 10,
+        per_page: 1,
         page: 1,
         headers,
     })
