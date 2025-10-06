@@ -15,7 +15,7 @@ await sleep(25000) //Wait for secrets to be available
 //Selftest for jira-proxy
 const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8080", {
     headers: {
-        Authorization: `Bearer ${ (await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.jira-proxy/.default")).access_token}`
+        Authorization: `Bearer ${(await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.jira-proxy/.default")).access_token}`
     }
 })
 

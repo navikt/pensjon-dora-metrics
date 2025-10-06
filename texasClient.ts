@@ -1,6 +1,6 @@
 
 
-export const getTexasClientCredentialsToken = async ( scope: string): Promise<TexasTokenResponse> => {
+export const getTexasClientCredentialsToken = async (scope: string): Promise<TexasTokenResponse> => {
     const url = process.env.NAIS_TOKEN_ENDPOINT;
     const response = await fetch(url, {
         headers: {
@@ -13,8 +13,14 @@ export const getTexasClientCredentialsToken = async ( scope: string): Promise<Te
         }),
     });
 
+
     if (response.ok) {
-        return (await response.json()) as TexasTokenResponse;
+        const data = await response.json();
+        if (data.error) {
+            throw new Error(`Error fetching Texas token: ${data.error} - ${data.error_description}`);
+        }
+        console.log(JSON.stringify(data));
+        return data as TexasTokenResponse;
     } else {
         throw new Error(`Failed to fetch Texas token: ${response.status} ${response.statusText}`);
     }
