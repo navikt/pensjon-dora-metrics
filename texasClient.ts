@@ -19,7 +19,6 @@ export const getTexasClientCredentialsToken = async (scope: string): Promise<Tex
         if (data.error) {
             throw new Error(`Error fetching Texas token: ${data.error} - ${data.error_description}`);
         }
-        console.log(JSON.stringify(data));
         return data as TexasTokenResponse;
     } else {
         throw new Error(`Failed to fetch Texas token: ${response.status} ${response.statusText}`);

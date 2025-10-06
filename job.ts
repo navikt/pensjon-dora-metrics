@@ -15,12 +15,11 @@ const token = await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.
 if (!token || !token.access_token) {
     throw new Error("Failed to get token from Texas");
 }
-console.log("token length", token.access_token.length);
 
 //Selftest for jira-proxy
 const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8080", {
     headers: {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token.access_token}`
     }
 })
 
