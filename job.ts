@@ -134,7 +134,7 @@ async function createRecoveredIncidents(dataset: Dataset): Promise<RecoveredInci
 
 async function getHotfixDeploysNotReferencedInRecoveredIncidents(dataset: Dataset): Promise<HotfixDeploy[]> {
     const query = `
-        SELECT hd.pull, hd.repo
+        SELECT hd.pull, hd.repo, hd.team, hd.deployedAt, hd.referencedPull, hd.referencedJira
         FROM \`${dataset.id}.hotfix_deploys\` hd
         LEFT JOIN \`${dataset.id}.recovered_incidents\` ri ON hd.referencedJira = ri.jira
         WHERE ri.jira IS NULL AND hd.referencedJira IS NOT NULL
@@ -147,7 +147,7 @@ async function getHotfixDeploysNotReferencedInRecoveredIncidents(dataset: Datase
         referencedJira: r.referencedJira,
         team: r.team,
         repo: r.repo,
-        deployedAt: r.deployedAt.value,
+        deployedAt: r.deployedAt,
     } as HotfixDeploy));
 }
 

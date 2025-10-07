@@ -12,6 +12,7 @@ export async function getJiraIssue(issueKey: string) {
         throw new Error("Failed to get token from Texas");
     }
 
+    console.log("Fetching issue from Jira: ", issueKey);
     const response = await fetch(`${JIRA_URL}/api/issue/${issueKey}`, {
         headers: {
             Authorization: `Bearer ${token.access_token}`
