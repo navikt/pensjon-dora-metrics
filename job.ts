@@ -1,58 +1,41 @@
 import fs from 'fs';
-import type {GithubData, HotfixDeploy, Repository, SuccessfulDeploy} from "./model.ts";
+import type {GithubData, HotfixDeploy, RecoveredIncident, Repository, SuccessfulDeploy} from "./model.ts";
+import type {RowMetadata, TableSchema} from "@google-cloud/bigquery";
 import {BigQuery, Dataset} from "@google-cloud/bigquery";
-import type {TableSchema, RowMetadata} from "@google-cloud/bigquery";
 import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
-import {getTexasClientCredentialsToken} from "./texasClient.ts";
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+import {getJiraIssue} from "./jiraService.ts";
+import {sleep} from "./utils.ts";
 
 await sleep(25000) //Wait for secrets to be available
-const token = await getTexasClientCredentialsToken("api://prod-fss.pesys-felles.jira-proxy/.default");
-if (!token || !token.access_token) {
-    throw new Error("Failed to get token from Texas");
-}
-
-//Selftest for jira-proxy
-const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PEB-1331", {
-    headers: {
-        Authorization: `Bearer ${token.access_token}`
-    }
-})
-
-if(!test.ok) {
-    console.log("JiraProxy isAlive??",test.status,test.statusText)
-    throw new Error("JiraProxy is not reachable")
-}
-
-const text = await test.text()
-
-console.log("JiraProxy isAlive??",text)
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
 const {repositories} = getGithubDataFromFile('github.json')
 
 const {successfulDeploys, hotfixDeploys} = await processRepositories(repositories)
-await pushToBigQuery({successfulDeploys, hotfixDeploys, dataset});
+await insertDeployDataToBigQuery({successfulDeploys, hotfixDeploys, dataset});
+
+const recoveredIncidents = await createRecoveredIncidents(dataset);
+await insertData('recovered_incidents', recoveredIncidents, dataset);
 
 async function processRepositories(repositories: Repository[]): Promise<{
     successfulDeploys: SuccessfulDeploy[],
-    hotfixDeploys: HotfixDeploy[]
+    hotfixDeploys: HotfixDeploy[],
 }> {
     const successfulDeploys: SuccessfulDeploy[] = [];
     const hotfixDeploys: HotfixDeploy[] = [];
     for (const repository of repositories) {
-        const {successfulDeploys: s, hotfixDeploys: h} = await createDoraMetricsFromRepository(repository, dataset);
+        const {
+            successfulDeploys: s,
+            hotfixDeploys: h,
+        } = await createDeployRows(repository);
         successfulDeploys.push(...s);
         hotfixDeploys.push(...h);
     }
     return {successfulDeploys, hotfixDeploys};
 }
 
-export async function createDoraMetricsFromRepository(repository: Repository, dataset: Dataset): Promise<{
+export async function createDeployRows(repository: Repository): Promise<{
     successfulDeploys: SuccessfulDeploy[];
     hotfixDeploys: HotfixDeploy[];
 }> {
@@ -75,102 +58,102 @@ export async function createDoraMetricsFromRepository(repository: Repository, da
     const hotfixDeploys: HotfixDeploy[] =
         (await Promise.all(
             pulls
-                .filter(pr => pr.labels.includes("hotfix") || pr.branch.toLowerCase().startsWith("hotfix"))
+                .filter(pr => pr.isBugfix)
                 .map(async deploy => {
-                    if (deploy.referencedPull === null) {
 
+                    const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
+
+                    if (deploy.referencedJira === null) {
                         //if time is less than a day, ignore and give it som time
-                        const daysSinceDeploy = (new Date().getTime() - new Date(deploy.deployment.deployedAt).getTime()) / (1000 * 60 * 60 * 24);
                         if (daysSinceDeploy < 2) {
-                            logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
+                            logger.info(`Hotfix deploy PR #${deploy.pullNumber} has no referenced Jira, but was deployed less than two days ago (${daysSinceDeploy.toFixed(2)} days), ignoring for now`);
                             return null;
                         }
-                        logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced PR`);
-                        return {
-                            pull: deploy.pullNumber,
-                            referencedPull: deploy.referencedPull,
-                            repo: repository.name,
-                            team: deploy.team,
-                            deployedAt: deploy.deployment.deployedAt,
-                            timeToRecovery: null
-                        };
+                        logger.warn(`Hotfix deploy PR #${deploy.pullNumber} has no referenced Jira`);
                     }
-                    const referencedDeploy = successfulDeploys.find(pr => pr.pull === deploy.referencedPull) || await getExistingSuccesfulDeployFromBigQuery(dataset, deploy.referencedPull, repository.name);
-                    if (referencedDeploy === undefined) {
-                        logger.warn(`Hotfix deploy PR #${deploy.pullNumber} references PR #${deploy.referencedPull} which is not in list of successful deploys.`);
-                        return {
-                            pull: deploy.pullNumber,
-                            referencedPull: deploy.referencedPull,
-                            repo: repository.name,
-                            team: deploy.team,
-                            deployedAt: deploy.deployment.deployedAt,
-                            timeToRecovery: null
-                        };
-                    }
-                    const timeToRecovery = (new Date(deploy.deployment.deployedAt).getTime() - new Date(referencedDeploy.deployedAt).getTime()) / (1000 * 60);
-                    logger.info(`Deploy dates: referenced PR #${referencedDeploy.pull} deployed at ${referencedDeploy.deployedAt}, hotfix PR #${deploy.pullNumber} deployed at ${deploy.deployment.deployedAt}`);
-                    logger.info(`Hotfix deploy PR #${deploy.pullNumber} time to recovery: ${timeToRecovery.toFixed(2)} minutes (referenced PR #${deploy.referencedPull}) repo: ${repository.name}`);
+
                     return {
                         pull: deploy.pullNumber,
                         referencedPull: deploy.referencedPull,
+                        referencedJira: deploy.referencedJira,
                         repo: repository.name,
                         team: deploy.team,
                         deployedAt: deploy.deployment.deployedAt,
-                        timeToRecovery: timeToRecovery.toFixed(2)
+                        timeToRecovery: null
                     };
                 })
         )).filter(deploy => deploy !== null) as HotfixDeploy[];
+
     return {
         successfulDeploys,
         hotfixDeploys,
     }
 }
 
-export async function getExistingSuccesfulDeployFromBigQuery(dataset: Dataset, pull: number, repo: string): Promise<SuccessfulDeploy | null> {
-    const table = dataset.table('successful_deploys');
-    const tableRef = `\`${dataset.id}.${table.id}\``;
-    const query = `SELECT *
-                   FROM ${tableRef}
-                   WHERE pull = @pull
-                     AND repo = @repo LIMIT 1`;
-    const options = {
-        query: query,
-        params: {pull, repo},
-    };
 
-    try {
 
-        const [job] = await dataset.bigQuery.createQueryJob(options);
-        const [rows] = await job.getQueryResults();
-        logger.info(rows)
-        if (rows.length > 0) {
-            const row = rows[0];
-            return {
-                pull: row.pull,
-                repo: row.repo,
-                team: row.team,
-                deployedAt: row.deployedAt.value,
-                leadTime: row.leadTime,
-            };
-        }
+async function createRecoveredIncidentFromHotfixDeploy(hotfixDeploy: HotfixDeploy): Promise<RecoveredIncident | null> {
+    if (hotfixDeploy.referencedJira === null) {
+        logger.warn(`Cannot create RecoveredIncident from HotfixDeploy PR #${hotfixDeploy.pull} because referencedJira is null`);
+        return null;
+    }
+    const jiraIssue = await getJiraIssue(hotfixDeploy.referencedJira)
 
-    } catch (error) {
-        if (error?.errors[0]?.errors) {
-            logger.error('Error:', error.errors[0].errors);
-        } else if (error?.errors[0]?.message) {
-            logger.error('Error:', error.errors[0].message);
-        } else {
-            logger.error('Error:', error);
-        }
-        throw error;
+    if (jiraIssue.fields.resolved === null) {
+        // Issue is not resolved, cannot be a recovered incident
+        return null;
     }
 
-    logger.warn("No existing successful deploy found in BigQuery for PR #" + pull + " in repo " + repo);
-    return undefined;
+    const detectedAt = new Date(jiraIssue.fields.created);
+    const recoveredAt = new Date(jiraIssue.fields.resolved);
+    const timeToRecovery = (recoveredAt.getTime() - detectedAt.getTime()) / (1000 * 60); //in minutes
+
+    logger.info(`Recovered incident Jira ${hotfixDeploy.referencedJira} time to recovery: ${timeToRecovery.toFixed(2)} minutes repo: ${hotfixDeploy.repo}`);
+
+    return {
+        jira: hotfixDeploy.referencedJira,
+        repo: hotfixDeploy.repo,
+        team: hotfixDeploy.team,
+        detectedAt: detectedAt.toISOString(),
+        recoveredAt: recoveredAt.toISOString(),
+        timeToRecovery: timeToRecovery.toFixed(2)
+    };
+
+}
+
+async function createRecoveredIncidents(dataset: Dataset): Promise<RecoveredIncident[]> {
+    const uniqueHotfixDeploys = await getHotfixDeploysNotReferencedInRecoveredIncidents( dataset)
+    const recoveredIncidents: RecoveredIncident[] = [];
+    for (const hotfixDeploy of uniqueHotfixDeploys) {
+        const recoveredIncident = await createRecoveredIncidentFromHotfixDeploy(hotfixDeploy);
+        if (recoveredIncident !== null) {
+            recoveredIncidents.push(recoveredIncident);
+        }
+    }
+    return recoveredIncidents;
+}
+
+async function getHotfixDeploysNotReferencedInRecoveredIncidents(dataset: Dataset): Promise<HotfixDeploy[]> {
+    const query = `
+        SELECT hd.pull, hd.repo
+        FROM \`${dataset.id}.hotfix_deploys\` hd
+        LEFT JOIN \`${dataset.id}.recovered_incidents\` ri ON hd.referencedJira = ri.jira
+        WHERE ri.jira IS NULL AND hd.referencedJira IS NOT NULL
+    `;
+    const [job] = await dataset.bigQuery.createQueryJob({query});
+    const [rows] = await job.getQueryResults();
+    return rows.map((r) => ({
+        pull: r.pull,
+        referencedPull: r.referencedPull,
+        referencedJira: r.referencedJira,
+        team: r.team,
+        repo: r.repo,
+        deployedAt: r.deployedAt.time,
+    } as HotfixDeploy));
 }
 
 
-export async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
+export async function insertDeployDataToBigQuery({successfulDeploys, hotfixDeploys, dataset}: {
     successfulDeploys: SuccessfulDeploy[],
     hotfixDeploys: HotfixDeploy[],
     dataset: Dataset
@@ -184,6 +167,7 @@ export async function pushToBigQuery({successfulDeploys, hotfixDeploys, dataset}
 
     await insertData('successful_deploys', successfulDeploysToInsert, dataset);
     await insertData('hotfix_deploys', hotfixDeploysToInsert, dataset);
+
 }
 
 

@@ -30,6 +30,8 @@ export type PullRequest = {
     commits: Commit[];
     deployment: Deployment
     referencedPull: number | null;
+    referencedJira: string | null;
+    isBugfix: boolean;
 }
 
 export type Commit = {
@@ -53,14 +55,23 @@ export type SuccessfulDeploy = {
 export type HotfixDeploy = {
     pull: number;
     referencedPull: number | null;
+    referencedJira: string | null;
     repo: string;
     team: string | null;
     deployedAt: string;
-    timeToRecovery: string | null;
+}
+
+export type RecoveredIncident = {
+    jira: string;
+    repo: string;
+    team: string | null;
+    detectedAt: string;
+    recoveredAt: string;
+    timeToRecovery: string;
 }
 
 export type RepositoryCache = {
     repo: string
     latestPullRequest: number;
-    hasUnreferencedHotfix: boolean;
+    hasUnreferencedBugfix: boolean;
 }

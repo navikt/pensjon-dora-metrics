@@ -14,10 +14,22 @@ export const schemaHotfixDeploys: TableSchema = {
     fields: [
         {name: 'pull', type: 'INTEGER', mode: 'REQUIRED'},
         {name: 'referencedPull', type: 'INTEGER', mode: 'NULLABLE'},
+        {name: 'referencedJira', type: 'STRING', mode: 'NULLABLE'},
         {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
         {name: 'team', type: 'STRING', mode: 'NULLABLE'},
         {name: 'deployedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
         {name: 'timeToRecovery', type: 'FLOAT', mode: 'NULLABLE'},
+    ],
+}
+
+export const schemaRecoveredIncidents: TableSchema = {
+    fields: [
+        {name: 'jira', type: 'STRING', mode: 'REQUIRED'},
+        {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
+        {name: 'team', type: 'STRING', mode: 'NULLABLE'},
+        {name: 'detectedAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
+        {name: 'recoveredAt', type: 'TIMESTAMP', mode: 'REQUIRED'},
+        {name: 'timeToRecovery', type: 'FLOAT', mode: 'REQUIRED'},
     ],
 }
 

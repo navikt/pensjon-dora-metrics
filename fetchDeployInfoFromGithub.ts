@@ -1,7 +1,7 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
 import type {GithubData, PullRequest, Repository, RepositoryCache, User} from "./model";
-import {findPullReference} from "./utils.ts";
+import {findJiraReference, findPullReference} from "./utils.ts";
 import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
 
 const token = process.env.GITHUB_TOKEN;
@@ -12,6 +12,10 @@ const octokit = new Octokit({
 const headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
+
+
+const teamsToCommentOn = ["pensjon og uføre felles"];
+const bugfixBranches = ["bugfix", "hotfix", "fix", "patch"];
 
 async function scrapeGithubRepository(repo: string, workflowName: string, deployJob: string, teamMembers: User[]): Promise<{
     pullRequests: PullRequest[],
@@ -28,27 +32,35 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
     })
 
     let latestPullRequest = -1;
-    let hasUnreferencedHotfix = false;
+    let hasUnreferencedBugfix = false;
 
     const pullRequests = (
         await Promise.all(pulls.data.filter(pull => pull.merged_at)
             .map(async (pull) => {
 
                 const team = teamMembers.find(member => member.githubUsername.toLowerCase() === pull.user?.login.toLowerCase())?.team || null;
-                const isHotfix = pull.labels.map(label => label.name).includes("hotfix") || pull.head.ref.toLowerCase().startsWith("hotfix");
+                let isBugfix = false;
                 latestPullRequest = Math.max(...pulls.data.map(p => p.number));
 
+                const hasBugLabel = pull.labels.map(label => label.name).includes("bug");
 
-                if (pull.head.ref.toLowerCase().startsWith("hotfix") && !pull.labels.map(label => label.name).includes("hotfix")) {
-                    //Add hotfix label if missing
-                    await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-                        owner,
-                        repo,
-                        issue_number: pull.number,
-                        labels: ["hotfix"],
-                        headers,
-                    });
+                if (hasBugLabel) {
+                    isBugfix = true;
+                }
 
+                //Check if branch name indicates a bugfix using bugfixBranches list
+                if (bugfixBranches.some(prefix => pull.head.ref.toLowerCase().startsWith(prefix))) {
+                    isBugfix = true;
+                    if (!hasBugLabel) {
+                        //Add bug label if missing
+                        await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+                            owner,
+                            repo,
+                            issue_number: pull.number,
+                            labels: ["bug"],
+                            headers,
+                        });
+                    }
                 }
 
                 const commits = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/commits', {
@@ -84,21 +96,26 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
 
 
                 const comments = reviewComments.concat(issueComments);
+                const fagsystemSpace = "FAGSYSTEM"
                 const referencedPull = findPullReference(comments) || findPullReference(commits.data.map(commit => commit.commit.message)) || findPullReference(pull.body) || null;
+                const referencedFagsystemSak = findJiraReference(comments, fagsystemSpace)
+                    || findJiraReference(commits.data.map(commit => commit.commit.message), fagsystemSpace) || findJiraReference(pull.body, fagsystemSpace) || null;
 
-                if (isHotfix) {
-                    if (referencedPull === null) {
-                        hasUnreferencedHotfix = true
-                        //Ask for reference in a comment if not already asked
-                        const body = "Hei! :wave: Dette ser ut som en hotfix. Vennligst legg til en referanse til PR-en som ble fikset i kommentarfeltet. :pray: ";
-                        if (!comments.includes(body)) {
-                            await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-                                owner,
-                                repo: 'pensjon-pen',
-                                issue_number: pull.number,
-                                body,
-                                headers,
-                            });
+                if (isBugfix) {
+                    if (referencedFagsystemSak === null) {
+                        hasUnreferencedBugfix = true
+                        if (team === "pensjon og uføre felles") {
+                            //Ask for reference in a comment if not already asked
+                            const body = "Hei! :wave: Hvis dette er en feilretting, hadde det vært flott om du kunne oppgi en fagsystemsak i kommentarfeltet dersom det er relevant. :pray: :smile:";
+                            if (!comments.includes(body)) {
+                                await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+                                    owner,
+                                    repo: 'pensjon-pen',
+                                    issue_number: pull.number,
+                                    body,
+                                    headers,
+                                });
+                            }
                         }
                     }
                 }
@@ -137,6 +154,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     mergedAt: pull.merged_at,
                     title: pull.title,
                     referencedPull: referencedPull,
+                    referencedJira: referencedFagsystemSak,
                     commits: commits.data.map(commit => ({
                         message: commit.commit.message,
                         timestamp: commit.commit.author?.date,
@@ -144,14 +162,15 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     deployment: {
                         environment: "prod",
                         deployedAt: deploymentJob.completed_at,
-                    }
+                    },
+                    isBugfix,
                 };
             }))).filter(pr => pr !== null) as PullRequest[];
 
     const newRepositoryCache: RepositoryCache = {
         repo,
         latestPullRequest,
-        hasUnreferencedHotfix,
+        hasUnreferencedBugfix,
     }
 
     return {
@@ -187,8 +206,6 @@ async function getTeamMembers(): Promise<User[]> {
 }
 
 
-
-
 function getRepositoryCache() {
     //Read repository cache if it exists
     let repositoryCache: RepositoryCache[] = [];
@@ -205,7 +222,10 @@ function getRepositoryCache() {
 const teamMembers = await getTeamMembers();
 const repositoryCache = getRepositoryCache();
 
-const {repositories, newRepositoriesCache}: {repositories: Repository[], newRepositoriesCache: RepositoryCache[]} = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
+const {repositories, newRepositoriesCache}: {
+    repositories: Repository[],
+    newRepositoriesCache: RepositoryCache[]
+} = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
     const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers);
 
     const repository = {
