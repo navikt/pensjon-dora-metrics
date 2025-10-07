@@ -112,7 +112,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                                 console.log("Commenting on pull request #" + pull.number);
                                 await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
                                     owner,
-                                    repo: 'pensjon-pen',
+                                    repo: repo,
                                     issue_number: pull.number,
                                     body,
                                     headers,
