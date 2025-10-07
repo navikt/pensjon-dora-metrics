@@ -17,7 +17,7 @@ if (!token || !token.access_token) {
 }
 
 //Selftest for jira-proxy
-const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PL-8080", {
+const test = await fetch("https://jira-proxy.prod-fss-pub.nais.io/api/issue/PEB-1331", {
     headers: {
         Authorization: `Bearer ${token.access_token}`
     }
