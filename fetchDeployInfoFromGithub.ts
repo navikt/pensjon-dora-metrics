@@ -26,7 +26,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
         owner,
         repo,
         state: 'closed',
-        per_page: 1,
+        per_page: 2,
         page: 1,
         headers,
     })
@@ -105,9 +105,11 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     if (referencedFagsystemSak === null) {
                         hasUnreferencedBugfix = true
                         if (team === "pensjon og uføre felles") {
+                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM case. Team: " + team + ", Branch: " + pull.head.ref);
                             //Ask for reference in a comment if not already asked
                             const body = "Hei! :wave: Hvis dette er en feilretting, hadde det vært flott om du kunne oppgi en fagsystemsak i kommentarfeltet dersom det er relevant. :pray: :smile:";
                             if (!comments.includes(body)) {
+                                console.log("Commenting on pull request #" + pull.number);
                                 await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
                                     owner,
                                     repo: 'pensjon-pen',
@@ -116,6 +118,8 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                                     headers,
                                 });
                             }
+                        } else {
+                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM case. Team: " + team + ", Branch: " + pull.head.ref + ". Not commenting since team is not in comment list.");
                         }
                     }
                 }
