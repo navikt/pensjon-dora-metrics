@@ -79,7 +79,6 @@ export async function createDeployRows(repository: Repository): Promise<{
                         repo: repository.name,
                         team: deploy.team,
                         deployedAt: deploy.deployment.deployedAt,
-                        timeToRecovery: null
                     };
                 })
         )).filter(deploy => deploy !== null) as HotfixDeploy[];
