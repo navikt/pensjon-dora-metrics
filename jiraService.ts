@@ -13,7 +13,7 @@ export async function getJiraIssue(issueKey: string) {
     }
 
     console.log("Fetching issue from Jira: ", issueKey);
-    const response = await fetch(`${JIRA_URL}/api/issue/${issueKey}`, {
+    const response = await fetch(`${JIRA_URL}/issue/${issueKey}`, {
         headers: {
             Authorization: `Bearer ${token.access_token}`
         }
