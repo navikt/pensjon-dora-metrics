@@ -36,4 +36,5 @@ export const schemaRecoveredIncidents: TableSchema = {
 export const BIGQUERY_TABLE_SCHEMAS = [
     {name: 'successful_deploys', schema: schemaSuccessfulDeploys},
     {name: 'hotfix_deploys', schema: schemaHotfixDeploys},
+    {name: 'recovered_incidents', schema: schemaRecoveredIncidents},
 ]
