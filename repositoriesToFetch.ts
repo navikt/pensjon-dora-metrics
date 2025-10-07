@@ -12,5 +12,5 @@ export const owner = 'navikt';
 export const REPOSITORIES_TO_FETCH: RepostioryToFetch[] = [
     {name: 'pensjon-pen', workflow: 'Build and deploy main', job: 'Deploy pen to production'},
     {name: 'pensjon-psak', workflow: 'Build and deploy main', job: 'Deploy prod'},
-    {name: 'pensjon-dora-metrics', workflow: 'Deploy DORA Metrics Job', job: 'Deploy to prod-gcp'},
+    {name: 'pensjon-dora-metrics', workflow: 'Deploy DORA Metrics Job', job: 'Build, push, and deploy'},
 ]
