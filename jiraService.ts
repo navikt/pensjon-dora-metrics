@@ -45,6 +45,6 @@ type IssueDetails = {
         };
         created: string;
         updated: string;
-        resolved: string | null;
+        resolutiondate: string | null;
     }
 }

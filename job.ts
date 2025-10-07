@@ -98,14 +98,14 @@ async function createRecoveredIncidentFromHotfixDeploy(hotfixDeploy: HotfixDeplo
     }
     const jiraIssue = await getJiraIssue(hotfixDeploy.referencedJira)
 
-    if (jiraIssue.fields.resolved === undefined || jiraIssue.fields.resolved === null) {
+    if (jiraIssue.fields.resolutiondate === null) {
         logger.info(`Jira issue ${hotfixDeploy.referencedJira} is not resolved, cannot be a recovered incident`);
         // Issue is not resolved, cannot be a recovered incident
         return null;
     }
 
     const detectedAt = new Date(jiraIssue.fields.created);
-    const recoveredAt = new Date(jiraIssue.fields.resolved);
+    const recoveredAt = new Date(jiraIssue.fields.resolutiondate);
     const timeToRecovery = (recoveredAt.getTime() - detectedAt.getTime()) / (1000 * 60); //in minutes
 
     logger.info(`Recovered incident Jira ${hotfixDeploy.referencedJira} time to recovery: ${timeToRecovery.toFixed(2)} minutes repo: ${hotfixDeploy.repo}`);
