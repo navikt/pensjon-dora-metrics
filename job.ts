@@ -98,7 +98,7 @@ async function createRecoveredIncidentFromHotfixDeploy(hotfixDeploy: HotfixDeplo
     }
     const jiraIssue = await getJiraIssue(hotfixDeploy.referencedJira)
 
-    if (jiraIssue.fields.resolved === null) {
+    if (jiraIssue.fields.resolved === undefined || jiraIssue.fields.resolved === null) {
         // Issue is not resolved, cannot be a recovered incident
         return null;
     }
