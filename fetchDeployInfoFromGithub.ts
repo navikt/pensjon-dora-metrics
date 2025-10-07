@@ -105,7 +105,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     if (referencedFagsystemSak === null) {
                         hasUnreferencedBugfix = true
                         if (team === "pensjon og uføre felles") {
-                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM case. Team: " + team + ", Branch: " + pull.head.ref);
+                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM sak. Team: " + team + ", Branch: " + pull.head.ref);
                             //Ask for reference in a comment if not already asked
                             const body = "Hei! :wave: Hvis dette er en feilretting, hadde det vært flott om du kunne oppgi en fagsystemsak i kommentarfeltet dersom det er relevant. :pray: :smile:";
                             if (!comments.includes(body)) {
@@ -119,7 +119,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                                 });
                             }
                         } else {
-                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM case. Team: " + team + ", Branch: " + pull.head.ref + ". Not commenting since team is not in comment list.");
+                            console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM sak. Team: " + team + ", Branch: " + pull.head.ref + ". Not commenting since team is not in comment list.");
                         }
                     }
                 }

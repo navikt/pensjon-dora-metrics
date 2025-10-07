@@ -147,7 +147,7 @@ async function getHotfixDeploysNotReferencedInRecoveredIncidents(dataset: Datase
         referencedJira: r.referencedJira,
         team: r.team,
         repo: r.repo,
-        deployedAt: r.deployedAt.time,
+        deployedAt: r.deployedAt.value,
     } as HotfixDeploy));
 }
 
