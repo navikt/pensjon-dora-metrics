@@ -105,7 +105,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
     })
 
     let latestPullRequest = -1;
-    let hasUnreferencedBugfix = false;
+    let hasUnreferencedBugfixes = false;
 
     const pullRequests = (
         await Promise.all(pulls.data.filter(pull => pull.merged_at)
@@ -176,7 +176,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
 
                 if (isBugfix) {
                     if (referencedFagsystemSak === null) {
-                        hasUnreferencedBugfix = true
+                        hasUnreferencedBugfixes = true
                         if (team === "pensjon og uføre felles") {
                             console.log("Pull request #" + pull.number + " is a bugfix but has no referenced FAGSYSTEM sak. Team: " + team + ", Branch: " + pull.head.ref);
                             //Ask for reference in a comment if not already asked
@@ -247,7 +247,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
     const newRepositoryCache: RepositoryCache = {
         repo,
         latestPullRequest,
-        hasUnreferencedBugfixes: hasUnreferencedBugfix,
+        hasUnreferencedBugfixes
     }
 
     return {
@@ -289,7 +289,7 @@ async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<Reposit
     return rows.map(row => ({
         repo: row.repo,
         latestPullRequest: row.latestPullRequest,
-        hasUnreferencedBugfixes: row.hasUnreferencedBugfix,
+        hasUnreferencedBugfixes: row.hasUnreferencedBugfixes,
     } as RepositoryCache));
 }
 
@@ -306,7 +306,7 @@ async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dat
         schema: schemaCachedRepoState
     });
     console.log("Created new cache table");
-    await sleep(3000); //Wait for table to be ready
+    await sleep(5000); //Wait for table to be ready
 
     await insertDataIntoBigQueryTable('cached_repo_state', newCache, dataset);
 
