@@ -33,8 +33,17 @@ export const schemaRecoveredIncidents: TableSchema = {
     ],
 }
 
+export const schemaCachedRepoState: TableSchema = {
+    fields: [
+        {name: 'repo', type: 'STRING', mode: 'REQUIRED'},
+        {name: 'latestPullRequest' , type: 'INTEGER', mode: 'REQUIRED'},
+        {name: 'hasUnreferencedBugfixes', type: 'BOOLEAN', mode: 'REQUIRED'},
+    ],
+}
+
 export const BIGQUERY_TABLE_SCHEMAS = [
     {name: 'successful_deploys', schema: schemaSuccessfulDeploys},
     {name: 'hotfix_deploys', schema: schemaHotfixDeploys},
     {name: 'recovered_incidents', schema: schemaRecoveredIncidents},
+    {name: 'cached_repo_state', schema: schemaCachedRepoState},
 ]

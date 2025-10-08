@@ -11,7 +11,7 @@ import {getGithubData} from "./githubScraper.ts";
 await sleep(25000) //Wait for secrets to be available
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
-const {repositories} = await getGithubData()
+const {repositories} = await getGithubData(dataset)
 
 const {successfulDeploys, hotfixDeploys} = await processRepositories(repositories)
 await insertDeployDataToBigQuery({successfulDeploys, hotfixDeploys, dataset});

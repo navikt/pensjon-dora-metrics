@@ -20,12 +20,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Restore repositoryCache.json
-        uses: actions/cache/restore@v4
-        with:
-          path: repositoryCache.json
-          key: repositoryCache
-
       - name: Build and push Docker image
         uses: nais/docker-build-push@v0
         id: docker-push
@@ -40,9 +34,3 @@ jobs:
           APIKEY: ${{ secrets.NAIS_DEPLOY_APIKEY }}
           CLUSTER: prod-gcp
           RESOURCE: .nais/dora-naisjob.yml
-
-      - name: Cache repositoryCache.json
-        uses: actions/cache/save@v4
-        with:
-            path: repositoryCache.json
-            key: repositoryCache

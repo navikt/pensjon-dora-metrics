@@ -3,6 +3,8 @@ import {Octokit} from "@octokit/core";
 import type {GithubData, PullRequest, Repository, RepositoryCache, User} from "./model";
 import {findJiraReference, findPullReference} from "./utils.ts";
 import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
+import {Dataset} from "@google-cloud/bigquery";
+import {schemaCachedRepoState} from "./bigqueryTableSchemas.ts";
 
 const token = process.env.GITHUB_TOKEN;
 
@@ -16,16 +18,17 @@ const headers = {
 const BUGFIX_BRANCHES = ["bugfix", "hotfix", "fix", "patch"];
 
 
-export async function getGithubData(): Promise<GithubData> {
+export async function getGithubData(dataset: Dataset): Promise<GithubData> {
 
-    const repositoryCache = getRepositoryCache();
+    const repositoryCache = await getRepositoryCacheFromBigQuery(dataset);
     const teamMembers = await getTeamMembers();
 
     const {repositories, newRepositoriesCache}: {
         repositories: Repository[],
         newRepositoriesCache: RepositoryCache[]
     } = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
-        const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers);
+        const cachedRepo = repositoryCache.find(repo => repo.repo === name);
+        const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers, cachedRepo);
 
         const repository = {
             name,
@@ -37,10 +40,16 @@ export async function getGithubData(): Promise<GithubData> {
             newRepositoryCache,
         }
 
-    })).then(results => {
+    })).then(async results => {
+
+        const repositories = results.map(result => result.repository).filter(repo => repo.pulls.length > 0);
+        const newRepositoriesCache = results.map(result => result.newRepositoryCache);
+
+        await writeNewCacheToBigQuery(newRepositoriesCache, dataset);
+
         return {
-            repositories: results.map(result => result.repository),
-            newRepositoriesCache: results.map(result => result.newRepositoryCache),
+            repositories,
+            newRepositoriesCache,
         }
     });
 
@@ -52,10 +61,35 @@ export async function getGithubData(): Promise<GithubData> {
 }
 
 
-async function scrapeGithubRepository(repo: string, workflowName: string, deployJob: string, teamMembers: User[]): Promise<{
+async function scrapeGithubRepository(repo: string, workflowName: string, deployJob: string, teamMembers: User[], cache: RepositoryCache | undefined): Promise<{
     pullRequests: PullRequest[],
     newRepositoryCache: RepositoryCache,
 }> {
+
+    //Get latest pull request for caching purposes
+    const latestPull = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
+        owner,
+        repo,
+        state: 'closed',
+        sort: 'created',
+        direction: 'desc',
+        per_page: 1,
+        page: 1,
+        headers,
+    });
+
+    if (latestPull.data.length !== 0) {
+        const latestPullNumber = latestPull.data[0].number;
+        if (cache && cache.latestPullRequest === latestPullNumber && !cache.hasUnreferencedBugfix) {
+            console.log(`No new pull requests in ${repo} since last check. Skipping...`);
+            return {
+                pullRequests: [],
+                newRepositoryCache: cache,
+            }
+        } else {
+            console.log(`New pull requests found in ${repo}. Fetching...`);
+        }
+    }
 
     const pulls = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner,
@@ -256,6 +290,46 @@ function getRepositoryCache() {
         console.log("No repository cache found");
     }
     return repositoryCache;
+}
+
+async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<RepositoryCache[]> {
+    const table = dataset.table('cached_repo_state');
+    const [rows] = await table.getRows();
+    return rows.map(row => ({
+        repo: row.repo,
+        latestPullRequest: row.latestPullRequest,
+        hasUnreferencedBugfix: row.hasUnreferencedBugfix,
+    } as RepositoryCache));
+}
+
+async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dataset) {
+    const table = dataset.table('cached_repo_state');
+    try {
+        await table.delete({ignoreNotFound: true});
+        console.log("Deleted old cache table");
+    } catch (error) {
+        console.error("Error deleting old cache table: ", error);
+    }
+    try {
+        await table.create({
+            schema: schemaCachedRepoState
+        });
+        console.log("Created new cache table");
+    } catch (error) {
+        console.error("Error creating new cache table: ", error);
+        return;
+    }
+    try {
+        if (newCache.length > 0) {
+            await table.insert(newCache);
+            console.log("Inserted " + newCache.length + " rows into cache table");
+        } else {
+            console.log("No new cache entries to insert");
+        }
+    } catch (error) {
+        console.error("Error inserting new cache entries: ", error);
+    }
+
 }
 
 
