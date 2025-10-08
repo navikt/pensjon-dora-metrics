@@ -73,5 +73,5 @@ export type RecoveredIncident = {
 export type RepositoryCache = {
     repo: string
     latestPullRequest: number;
-    hasUnreferencedBugfix: boolean;
+    hasUnreferencedBugfixes: boolean;
 }

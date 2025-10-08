@@ -81,7 +81,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
 
     if (latestPull.data.length !== 0) {
         const latestPullNumber = latestPull.data[0].number;
-        if (cache && cache.latestPullRequest === latestPullNumber && !cache.hasUnreferencedBugfix) {
+        if (cache && cache.latestPullRequest === latestPullNumber && !cache.hasUnreferencedBugfixes) {
             console.log(`No new pull requests in ${repo} since last check. Skipping...`);
             return {
                 pullRequests: [],
@@ -244,7 +244,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
     const newRepositoryCache: RepositoryCache = {
         repo,
         latestPullRequest,
-        hasUnreferencedBugfix,
+        hasUnreferencedBugfixes: hasUnreferencedBugfix,
     }
 
     return {
@@ -299,7 +299,7 @@ async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<Reposit
     return rows.map(row => ({
         repo: row.repo,
         latestPullRequest: row.latestPullRequest,
-        hasUnreferencedBugfix: row.hasUnreferencedBugfix,
+        hasUnreferencedBugfixes: row.hasUnreferencedBugfix,
     } as RepositoryCache));
 }
 
