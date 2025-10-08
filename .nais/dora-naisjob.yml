@@ -7,6 +7,7 @@ metadata:
     team: "pesys-felles"
 spec:
   image: {{image}}
+  schedule: '0 7-17 * * *'
   resources:
     requests:
       cpu: 200m

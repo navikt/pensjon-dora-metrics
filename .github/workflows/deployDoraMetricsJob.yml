@@ -1,8 +1,6 @@
 name: Deploy DORA Metrics Job
 
 on:
-  schedule:
-    - cron: '0 7-17 * * *'
   push:
     branches:
       - main
