@@ -4,6 +4,7 @@ import {findJiraReference, findPullReference, sleep} from "./utils.ts";
 import {owner} from "./repositoriesToFetch.ts";
 import {Dataset} from "@google-cloud/bigquery";
 import {schemaCachedRepoState} from "./bigqueryTableSchemas.ts";
+import {insertDataIntoBigQueryTable} from "./bigqueryUtils.ts";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
@@ -317,16 +318,7 @@ async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dat
     console.log("Created new cache table");
     await sleep(2000); //Wait for table to be ready
 
-    try {
-        if (newCache.length > 0) {
-            await table.insert(newCache);
-            console.log("Inserted " + newCache.length + " rows into cache table");
-        } else {
-            console.log("No new cache entries to insert");
-        }
-    } catch (error) {
-        console.error("Error inserting new cache entries: ", error);
-    }
+    await insertDataIntoBigQueryTable('cached_repo_state', newCache, dataset);
 
 }
 
