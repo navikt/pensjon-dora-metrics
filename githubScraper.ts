@@ -280,19 +280,6 @@ async function getTeamMembers(): Promise<User[]> {
 }
 
 
-function getRepositoryCache() {
-    //Read repository cache if it exists
-    let repositoryCache: RepositoryCache[] = [];
-    if (fs.existsSync("repositoryCache.json")) {
-        const data = fs.readFileSync("repositoryCache.json", "utf-8");
-        repositoryCache = JSON.parse(data) as RepositoryCache[];
-        console.log("Loaded repository cache with " + repositoryCache.length + " entries");
-    } else {
-        console.log("No repository cache found");
-    }
-    return repositoryCache;
-}
-
 async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<RepositoryCache[]> {
     const table = dataset.table('cached_repo_state');
     const [rows] = await table.getRows();
