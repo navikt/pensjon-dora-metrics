@@ -16,5 +16,4 @@ export const REPOSITORIES_TO_FETCH: RepostioryToFetch[] = [
     {name: 'pensjon-selvbetjening', workflow: 'Prod: Dinpensjon backend deploy', job: 'deploy-to-prod'},
     {name: 'pensjon-selvbetjening-bytt-bruker', workflow: 'Prod: Bytt-bruker frontend deploy', job: 'deploy-frontend-borger-to-prod'},
     {name: 'pensjon-selvbetjening-familieforhold', workflow: 'Prod: Familieforhold backend deploy', job: 'deploy-to-prod'},
-    {name: 'pensjon-selvbetjening-saksoversikt', workflow: 'Prod: Pensjon Saksoversikt Backend deploy', job: 'deploy'}
 ]
