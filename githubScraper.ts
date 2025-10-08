@@ -316,7 +316,7 @@ async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dat
         schema: schemaCachedRepoState
     });
     console.log("Created new cache table");
-    await sleep(2000); //Wait for table to be ready
+    await sleep(3000); //Wait for table to be ready
 
     await insertDataIntoBigQueryTable('cached_repo_state', newCache, dataset);
 
