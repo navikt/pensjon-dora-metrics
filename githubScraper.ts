@@ -305,8 +305,23 @@ async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dat
     await table.create({
         schema: schemaCachedRepoState
     });
-    console.log("Created new cache table");
-    await sleep(5000); //Wait for table to be ready
+
+    //Wait until table is actually created
+    let tableExists = false;
+    for (let i = 0; i < 15; i++) {
+        const [exists] = await table.exists();
+        if (exists) {
+            tableExists = true;
+            break;
+        }
+        console.log("Waiting for cache table to be created...");
+        await sleep(2000);
+    }
+    if (!tableExists) {
+        throw new Error("Cache table was not created");
+    }
+
+    console.log("Writing new cache to BigQuery");
 
     await insertDataIntoBigQueryTable('cached_repo_state', newCache, dataset);
 
