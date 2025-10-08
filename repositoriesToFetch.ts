@@ -18,5 +18,6 @@ export const REPOSITORIES_TO_FETCH: RepostioryToFetch[] = [
     {name: 'pensjon-selvbetjening-familieforhold', workflow: 'Prod: Familieforhold backend deploy', job: 'deploy-to-prod'},
     {name: 'pensjon-selvbetjening-saksoversikt', workflow: 'Prod: Pensjon Saksoversikt Backend deploy', job: 'deploy'},
     {name: 'pensjon-fullmakt', workflow: 'NAIS Deploy Prod', job: 'Deploy to prod'},
-    {name: 'pensjon-selvbetjening-overfor-omsorgspoeng', workflow: 'Prod: Overfør omsorgsopptjening backend deploy', job: 'deploy-to-prod'}
+    {name: 'pensjon-selvbetjening-overfor-omsorgspoeng', workflow: 'Prod: Overfør omsorgsopptjening backend deploy', job: 'deploy-to-prod'},
+    {name: 'representasjon-banner-frontend', workflow: 'Prod: Representasjon-banner frontend deploy', job: 'deploy-frontend-to-prod'}
 ]
