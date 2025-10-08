@@ -23,38 +23,28 @@ export async function getGithubData(repositoriesToFetch: RepostioryToFetch[], da
     const repositoryCache = await getRepositoryCacheFromBigQuery(dataset);
     const teamMembers = await getTeamMembers();
 
-    const {repositories}: {
-        repositories: Repository[],
-    } = await Promise.all(repositoriesToFetch.map(async ({name, workflow, job}) => {
+    const repositories: Repository[] = [];
+    const newRepositoriesCache: RepositoryCache[] = [];
+
+    for (const repository of repositoriesToFetch) {
+
+        const {name, workflow, job} = repository;
+        console.log(`Fetching data for repository: ${name}`);
 
         const cachedRepo = repositoryCache.find(repo => repo.repo === name);
-
         const {
             pullRequests,
             newRepositoryCache
         } = await scrapeGithubRepository(name, workflow, job, teamMembers, cachedRepo);
 
-        const repository = {
+        repositories.push({
             name,
             pulls: pullRequests,
-        }
+        });
+        newRepositoriesCache.push(newRepositoryCache);
+    }
 
-        return {
-            repository,
-            newRepositoryCache,
-        }
-
-    })).then(async results => {
-
-        const repositories = results.map(result => result.repository).filter(repo => repo.pulls.length > 0);
-        const newRepositoriesCache = results.map(result => result.newRepositoryCache);
-
-        await writeNewCacheToBigQuery(newRepositoriesCache, dataset);
-
-        return {
-            repositories,
-        }
-    });
+    await writeNewCacheToBigQuery(newRepositoriesCache, dataset);
 
     return {
         repositories,
