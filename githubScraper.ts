@@ -1,34 +1,38 @@
 import fs from 'fs';
 import {Octokit} from "@octokit/core";
-import type {GithubData, PullRequest, Repository, RepositoryCache, User} from "./model";
+import type {GithubData, PullRequest, Repository, RepositoryCache, RepostioryToFetch, User} from "./model";
 import {findJiraReference, findPullReference} from "./utils.ts";
 import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
 import {Dataset} from "@google-cloud/bigquery";
 import {schemaCachedRepoState} from "./bigqueryTableSchemas.ts";
 
-const token = process.env.GITHUB_TOKEN;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
-const octokit = new Octokit({
-    auth: token,
-})
-const headers = {
+const GITHUB_HEADERS = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
-
 const BUGFIX_BRANCHES = ["bugfix", "hotfix", "fix", "patch"];
 
+const octokit = new Octokit({
+    auth: GITHUB_TOKEN,
+})
 
-export async function getGithubData(dataset: Dataset): Promise<GithubData> {
+
+export async function getGithubData(repositoriesToFetch: RepostioryToFetch[], dataset: Dataset): Promise<GithubData> {
 
     const repositoryCache = await getRepositoryCacheFromBigQuery(dataset);
     const teamMembers = await getTeamMembers();
 
-    const {repositories, newRepositoriesCache}: {
+    const {repositories}: {
         repositories: Repository[],
-        newRepositoriesCache: RepositoryCache[]
-    } = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
+    } = await Promise.all(repositoriesToFetch.map(async ({name, workflow, job}) => {
+
         const cachedRepo = repositoryCache.find(repo => repo.repo === name);
-        const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers, cachedRepo);
+
+        const {
+            pullRequests,
+            newRepositoryCache
+        } = await scrapeGithubRepository(name, workflow, job, teamMembers, cachedRepo);
 
         const repository = {
             name,
@@ -49,15 +53,12 @@ export async function getGithubData(dataset: Dataset): Promise<GithubData> {
 
         return {
             repositories,
-            newRepositoriesCache,
         }
     });
 
-    const githubData: GithubData = {
+    return {
         repositories,
-    }
-
-    return githubData;
+    };
 }
 
 
@@ -75,7 +76,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
         direction: 'desc',
         per_page: 1,
         page: 1,
-        headers,
+        headers: GITHUB_HEADERS,
     });
 
     if (latestPull.data.length !== 0) {
@@ -97,7 +98,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
         state: 'closed',
         per_page: 2,
         page: 1,
-        headers,
+        headers: GITHUB_HEADERS,
     })
 
     let latestPullRequest = -1;
@@ -127,7 +128,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                             repo,
                             issue_number: pull.number,
                             labels: ["bug"],
-                            headers,
+                            headers: GITHUB_HEADERS,
                         });
                     }
                 }
@@ -136,7 +137,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     owner,
                     repo,
                     pull_number: pull.number,
-                    headers,
+                    headers: GITHUB_HEADERS,
                 });
 
                 const workflows = (await octokit.request('GET /repos/{owner}/{repo}/actions/runs', {
@@ -146,21 +147,21 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     status: 'success',
                     head_sha: pull.merge_commit_sha,
                     workflow_id: 'deployProd.yml',
-                    headers,
+                    headers: GITHUB_HEADERS,
                 })).data.workflow_runs.filter(workflow => workflow.name.toLowerCase() === workflowName.toLowerCase());
 
                 const reviewComments = (await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/comments', {
                     owner,
                     repo,
                     pull_number: pull.number,
-                    headers,
+                    headers: GITHUB_HEADERS,
                 })).data.map(comment => comment.body);
 
                 const issueComments = (await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
                     owner,
                     repo,
                     issue_number: pull.number,
-                    headers,
+                    headers: GITHUB_HEADERS,
                 })).data.map(comment => comment.body);
 
 
@@ -184,7 +185,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                                     repo: repo,
                                     issue_number: pull.number,
                                     body,
-                                    headers,
+                                    headers: GITHUB_HEADERS,
                                 });
                             }
                         } else {
@@ -204,7 +205,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                     owner,
                     repo,
                     run_id: workflow.id,
-                    headers,
+                    headers: GITHUB_HEADERS,
                 })
 
                 const deploymentJob = jobs.data.jobs.filter(job => job.conclusion === "success").find(job => {
