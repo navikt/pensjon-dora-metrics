@@ -6,11 +6,12 @@ import {BIGQUERY_TABLE_SCHEMAS} from "./bigqueryTableSchemas.ts";
 import {logger} from "./logger.ts";
 import {getJiraIssue} from "./jiraService.ts";
 import {sleep} from "./utils.ts";
+import {getGithubData} from "./githubScraper.ts";
 
 await sleep(25000) //Wait for secrets to be available
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
-const {repositories} = getGithubDataFromFile('github.json')
+const {repositories} = await getGithubData()
 
 const {successfulDeploys, hotfixDeploys} = await processRepositories(repositories)
 await insertDeployDataToBigQuery({successfulDeploys, hotfixDeploys, dataset});

@@ -13,9 +13,44 @@ const headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
+const BUGFIX_BRANCHES = ["bugfix", "hotfix", "fix", "patch"];
 
-const teamsToCommentOn = ["pensjon og uføre felles"];
-const bugfixBranches = ["bugfix", "hotfix", "fix", "patch"];
+
+export async function getGithubData(): Promise<GithubData> {
+
+    const repositoryCache = getRepositoryCache();
+    const teamMembers = await getTeamMembers();
+
+    const {repositories, newRepositoriesCache}: {
+        repositories: Repository[],
+        newRepositoriesCache: RepositoryCache[]
+    } = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
+        const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers);
+
+        const repository = {
+            name,
+            pulls: pullRequests,
+        }
+
+        return {
+            repository,
+            newRepositoryCache,
+        }
+
+    })).then(results => {
+        return {
+            repositories: results.map(result => result.repository),
+            newRepositoriesCache: results.map(result => result.newRepositoryCache),
+        }
+    });
+
+    const githubData: GithubData = {
+        repositories,
+    }
+
+    return githubData;
+}
+
 
 async function scrapeGithubRepository(repo: string, workflowName: string, deployJob: string, teamMembers: User[]): Promise<{
     pullRequests: PullRequest[],
@@ -49,7 +84,7 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
                 }
 
                 //Check if branch name indicates a bugfix using bugfixBranches list
-                if (bugfixBranches.some(prefix => pull.head.ref.toLowerCase().startsWith(prefix))) {
+                if (BUGFIX_BRANCHES.some(prefix => pull.head.ref.toLowerCase().startsWith(prefix))) {
                     isBugfix = true;
                     if (!hasBugLabel) {
                         //Add bug label if missing
@@ -223,41 +258,4 @@ function getRepositoryCache() {
     return repositoryCache;
 }
 
-const teamMembers = await getTeamMembers();
-const repositoryCache = getRepositoryCache();
 
-const {repositories, newRepositoriesCache}: {
-    repositories: Repository[],
-    newRepositoriesCache: RepositoryCache[]
-} = await Promise.all(REPOSITORIES_TO_FETCH.map(async ({name, workflow, job}) => {
-    const {pullRequests, newRepositoryCache} = await scrapeGithubRepository(name, workflow, job, teamMembers);
-
-    const repository = {
-        name,
-        pulls: pullRequests,
-    }
-
-    return {
-        repository,
-        newRepositoryCache,
-    }
-
-})).then(results => {
-    return {
-        repositories: results.map(result => result.repository),
-        newRepositoriesCache: results.map(result => result.newRepositoryCache),
-    }
-});
-
-const githubData: GithubData = {
-    repositories,
-}
-
-console.log("Writing new repository cache with " + newRepositoriesCache.length + " entries");
-fs.writeFileSync("repositoryCache.json", JSON.stringify(newRepositoriesCache));
-
-console.log("Fetched data from GitHub:");
-githubData.repositories.forEach((repo) => {
-    console.log(`Repository: ${repo.name}, Pull Requests: ${repo.pulls.length}`);
-})
-fs.writeFileSync("github.json", JSON.stringify(githubData))

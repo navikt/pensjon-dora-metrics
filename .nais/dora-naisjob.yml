@@ -27,3 +27,6 @@ spec:
     outbound:
       external:
         - host: jira-proxy.prod-fss-pub.nais.io
+  spec:
+    envFrom:
+      - secret: dora-metrics-job
