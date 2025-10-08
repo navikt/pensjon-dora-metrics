@@ -67,6 +67,19 @@ async function scrapeGithubRepository(repo: string, workflowName: string, deploy
     newRepositoryCache: RepositoryCache,
 }> {
 
+    //Get ratelimit status
+    const rateLimit = await octokit.request('GET /rate_limit', {
+        headers: GITHUB_HEADERS,
+    });
+    const remaining = rateLimit.data.rate.remaining;
+    const reset = new Date(rateLimit.data.rate.reset * 1000);
+    console.log(`GitHub API rate limit remaining: ${remaining}, resets at ${reset.toISOString()}`);
+    if (remaining < 100) {
+        const waitTime = reset.getTime() - new Date().getTime() + 1000; //Add 1 second buffer
+        console.log(`Rate limit low, waiting for ${waitTime / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+
     //Get latest pull request for caching purposes
     const latestPull = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner,
@@ -292,21 +305,18 @@ async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<Reposit
 
 async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dataset) {
     const table = dataset.table('cached_repo_state');
+
+    //Delete all contents and reinsert
+    console.log("Updating cached_repo_state table in BigQuery");
+    const query = `DELETE FROM \`${dataset.id}.cached_repo_state\` WHERE TRUE`;
     try {
-        await table.delete({ignoreNotFound: true});
-        console.log("Deleted old cache table");
+        const [job] = await dataset.bigQuery.createQueryJob({query});
+        await job.getQueryResults();
+        console.log("Cleared cached_repo_state table");
     } catch (error) {
-        console.error("Error deleting old cache table: ", error);
+        console.error("Error clearing cached_repo_state table: ", error);
     }
-    try {
-        await table.create({
-            schema: schemaCachedRepoState
-        });
-        console.log("Created new cache table");
-    } catch (error) {
-        console.error("Error creating new cache table: ", error);
-        return;
-    }
+
     try {
         if (newCache.length > 0) {
             await table.insert(newCache);
