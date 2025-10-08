@@ -1,8 +1,9 @@
 import {Octokit} from "@octokit/core";
 import type {GithubData, PullRequest, Repository, RepositoryCache, RepostioryToFetch, User} from "./model";
-import {findJiraReference, findPullReference} from "./utils.ts";
+import {findJiraReference, findPullReference, sleep} from "./utils.ts";
 import {owner} from "./repositoriesToFetch.ts";
 import {Dataset} from "@google-cloud/bigquery";
+import {schemaCachedRepoState} from "./bigqueryTableSchemas.ts";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
@@ -304,16 +305,17 @@ async function getRepositoryCacheFromBigQuery(dataset: Dataset): Promise<Reposit
 async function writeNewCacheToBigQuery(newCache: RepositoryCache[], dataset: Dataset) {
     const table = dataset.table('cached_repo_state');
 
-    //Delete all contents and reinsert
-    console.log("Updating cached_repo_state table in BigQuery");
-    const query = `DELETE FROM \`${dataset.id}.cached_repo_state\` WHERE TRUE`;
-    try {
-        const [job] = await dataset.bigQuery.createQueryJob({query});
-        await job.getQueryResults();
-        console.log("Cleared cached_repo_state table");
-    } catch (error) {
-        console.error("Error clearing cached_repo_state table: ", error);
+    //Delete table and recreate it to remove old entries
+    const [exists] = await table.exists();
+    if (exists) {
+        await table.delete();
+        console.log("Deleted old cache table");
     }
+    await table.create({
+        schema: schemaCachedRepoState
+    });
+    console.log("Created new cache table");
+    await sleep(2000); //Wait for table to be ready
 
     try {
         if (newCache.length > 0) {
