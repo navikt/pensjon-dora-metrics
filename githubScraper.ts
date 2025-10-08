@@ -1,10 +1,8 @@
-import fs from 'fs';
 import {Octokit} from "@octokit/core";
 import type {GithubData, PullRequest, Repository, RepositoryCache, RepostioryToFetch, User} from "./model";
 import {findJiraReference, findPullReference} from "./utils.ts";
-import {owner, REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
+import {owner} from "./repositoriesToFetch.ts";
 import {Dataset} from "@google-cloud/bigquery";
-import {schemaCachedRepoState} from "./bigqueryTableSchemas.ts";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
