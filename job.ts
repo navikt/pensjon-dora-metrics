@@ -4,6 +4,8 @@ import {insertDataIntoBigQueryTable, insertDeployDataToBigQuery, setupBiqQuery} 
 import {createRecoveredIncidents, processRepositories} from "./doraMetricsProcessor.ts";
 import {REPOSITORIES_TO_FETCH} from "./repositoriesToFetch.ts";
 
+console.log("Starting Dora Metrics Job");
+
 await sleep(25000) //Wait for secrets to be available
 
 const {dataset} = setupBiqQuery('pensjon_dora_metrics')
